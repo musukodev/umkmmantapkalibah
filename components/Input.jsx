@@ -4,6 +4,7 @@ export default function Input({
   type = "text",
   textarea = false,
   error,
+  inputRef,
   ...props
 }) {
   const kelas =
@@ -15,6 +16,7 @@ export default function Input({
       {label}
       {textarea ? (
         <textarea
+          ref={inputRef}
           name={name}
           rows={4}
           className={`${kelas}${kelasError}`}
@@ -23,6 +25,7 @@ export default function Input({
         />
       ) : (
         <input
+          ref={inputRef}
           name={name}
           type={type}
           className={`${kelas}${kelasError}`}

@@ -10,7 +10,7 @@ Template workshop vibe coding Creative Hub App Talent (CHAT) 2026. Repo ini beri
 2. **Buat proyek Supabase.** Masuk ke [supabase.com](https://supabase.com) dengan akun GitHub, lalu buat proyek baru. Simpan password database di tempat aman.
 3. **Siapkan database.** Di Supabase, buka **SQL Editor**, tempel seluruh isi `docs/schema.sql`, lalu klik **Run**. Tabel `produk` beserta data awal akan terbentuk.
 4. **Siapkan akun admin.** Ikuti panduan akun admin yang dibagikan mentor. Setelah itu matikan pendaftaran akun baru di **Authentication > Sign In / Providers**.
-5. **Isi environment variable di Vercel.** Buka proyekmu di Vercel > **Settings > Environment Variables**, lalu isi tiga variabel dari `.env.example`. Nilainya ada di Supabase > **Project Settings > API**. Setelah itu lakukan **Redeploy**.
+5. **Isi environment variable di Vercel.** Buka proyekmu di Vercel > **Settings > Environment Variables**, lalu isi variabel dari `.env.example`: tiga variabel Supabase, ditambah `GEMINI_API_KEY` kalau memakai fitur deskripsi AI. Nilai Supabase ada di **Project Settings > API**. Setelah itu lakukan **Redeploy**.
 6. **Clone repo ke laptop.**
 
    ```bash
@@ -59,6 +59,7 @@ Urutan yang disarankan: US-01, US-02, US-03, US-04, US-05, US-06, lalu fitur bon
 - Identitas toko: ubah `lib/toko.js`.
 - Warna: ubah bagian `@theme` di `app/globals.css` (lihat `DESIGN.md`).
 - Produk: ubah langsung di Supabase > **Table Editor > produk**.
+- Deskripsi AI: isi `GEMINI_API_KEY` di server (lokal dan Vercel). `GEMINI_MODEL` opsional; default `gemini-2.5-flash`.
 
 ## Aturan penting
 
@@ -77,4 +78,4 @@ Urutan yang disarankan: US-01, US-02, US-03, US-04, US-05, US-06, lalu fitur bon
 - **Nama usaha:** Terpal B
 - **Pembuat:** musukodev
 - **Link aplikasi:** https://umkmmantapkalibah.vercel.app
-- **Fitur bonus yang dikerjakan:** US-07 (list produk admin), US-08 (tambah produk), US-09 (ubah produk), US-10 (hapus produk)
+- **Fitur bonus yang dikerjakan:** US-07 (list produk admin), US-08 (tambah produk), US-09 (ubah produk), US-10 (hapus produk), US-11 (filter dan pencarian), US-12 (jumlah pesanan), US-13 (PWA), US-14 (deskripsi AI)

@@ -142,6 +142,64 @@ Tombol Hapus memakai `window.confirm`, mengirim id produk lewat form ke Server A
 
 Ditambahkan gambar cadangan `public/produk/tanpa-foto.svg` untuk produk yang tidak punya `foto_url`, dipakai di katalog, tabel admin, dan halaman detail.
 
+## US-11 Filter kategori atau pencarian
+
+**Prompt [SENDIRI]:**
+
+> Baca docs/user-stories.md bagian US-11 dan DESIGN.md. Tambahkan pencarian nama produk dan filter kategori di halaman katalog. Query ke Supabase di server, bukan di browser. Pertahankan tampilan kartu dan grid yang ada, tampilkan pesan kalau tidak ada hasil, dan sediakan tombol untuk menghapus filter.
+
+**Hasil:**
+
+Form filter memakai method GET sehingga hasil bisa dibagikan lewat URL. Daftar kategori diambil dari database, pencarian memakai `ilike`, dan hasil menampilkan jumlah produk yang cocok. Kombinasi kata kunci dan kategori juga berfungsi.
+
+**Perbaikan:**
+
+Karakter `%`, `_`, dan `\` di kata kunci di-escape supaya tidak diperlakukan sebagai wildcard SQL. Kategori yang sedang dipilih tetap muncul di dropdown walaupun datanya baru berubah.
+
+## US-12 Pilih jumlah atau varian
+
+**Prompt [SENDIRI]:**
+
+> Baca docs/user-stories.md bagian US-12. Tambahkan pemilih jumlah pada halaman detail produk. Jumlah dan total harga harus ikut tertulis di pesan WhatsApp. Pertahankan tombol WhatsApp dan susunan halaman yang ada.
+
+**Hasil:**
+
+Halaman detail punya tombol kurang/tambah, kolom jumlah 1 sampai 99, dan total harga yang berubah mengikuti jumlah. Pesan WhatsApp berisi nama produk, jumlah, harga satuan, dan total. Tautan memakai `encodeURIComponent` dan tetap membuka tab baru.
+
+**Perbaikan:**
+
+Kolom jumlah boleh dikosongkan sementara saat mengetik, lalu kembali ke 1 saat kehilangan fokus. Nilai di luar 1–99 tidak diterima.
+
+## US-13 PWA
+
+**Prompt [SENDIRI]:**
+
+> Baca docs/user-stories.md bagian US-13. Buat web app manifest yang memakai nama toko dan ikon di public/icons (192 dan 512). Tautkan manifest di halaman, pakai tampilan standalone, dan tambahkan service worker supaya katalog bisa dipasang ke layar utama HP.
+
+**Hasil:**
+
+`app/manifest.js` menghasilkan `/manifest.webmanifest` dengan nama, deskripsi, warna, `start_url`, `scope`, `display: standalone`, dan dua ikon. Next.js menautkannya otomatis di `<head>`. Service worker `public/sw.js` didaftarkan oleh komponen client dan tidak menyimpan cache agar data selalu baru.
+
+**Perbaikan:**
+
+Ditambahkan ikon Apple Touch dan `theme-color` agar pemasangan di iOS/Android lebih rapi.
+
+## US-14 Deskripsi produk dibuat AI
+
+**Prompt [SENDIRI]:**
+
+> Baca docs/user-stories.md bagian US-14 dan aturan keamanan AGENTS.md. Tambahkan tombol “Buat deskripsi dengan AI” di FormProduk. Panggil Gemini API dari server memakai GEMINI_API_KEY, jangan pernah mengirim kunci ke browser. Hasilnya mengisi kolom deskripsi sebelum produk disimpan. Tangani error, timeout, dan kuota. Jangan memasang paket npm baru.
+
+**Hasil:**
+
+`lib/gemini.js` memanggil endpoint `generateContent` memakai `fetch` dan header `x-goog-api-key`. Server Action `buatDeskripsiProduk` memeriksa `wajibAdmin()`, memvalidasi nama, lalu mengembalikan deskripsi. Tombol di form menampilkan status proses dan mengisi textarea tanpa menghapus isian lain. Key hanya ada di server.
+
+**Perbaikan:**
+
+Ditambahkan batas panjang input, timeout 20 detik, pemetaan pesan untuk key kosong, kuota, model tidak ditemukan, dan permintaan yang diblokir. Deskripsi tetap bisa diisi manual kalau AI gagal.
+
 ## Debugging dan fitur bonus
 
 Pengujian US-07 sampai US-10 memakai akun uji sementara di Supabase Auth: menambah produk, mengubahnya, menghapusnya, dan memastikan aksi tanpa login ditolak. Produk dan akun uji sudah dihapus kembali; akun admin asli tidak diubah.
+
+US-11 diuji dengan pencarian “kopi”, filter kategori “Minuman”, kombinasi keduanya, dan kata kunci tanpa hasil. US-12 diuji dari HTML detail produk: jumlah awal 1, total harga, dan pesan WhatsApp sudah memuat jumlah. US-13 diuji dengan memastikan `/manifest.webmanifest` bertipe `application/manifest+json`, ikon 192/512 dapat diakses, service worker dapat diakses, dan `<link rel="manifest">` ada di halaman. US-14 diuji sampai jalur error `GEMINI_API_KEY` kosong; generasi sungguhan perlu diuji setelah key diisi di server.

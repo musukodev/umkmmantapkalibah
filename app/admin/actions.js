@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { buatKlienSesi } from "@/lib/supabase/ssr";
 import { wajibAdmin } from "@/lib/auth";
+import { buatDeskripsiDenganGemini } from "@/lib/gemini";
 
 function bacaNilaiProduk(formData) {
   return {
@@ -73,6 +74,55 @@ export async function gantiPassword(_keadaan, formData) {
   }
 
   return { sukses: "Password berhasil diganti. Gunakan password baru saat masuk berikutnya." };
+}
+
+export async function buatDeskripsiProduk(formData) {
+  await wajibAdmin();
+
+  const nama = String(formData.get("nama") ?? "").trim();
+  const kategori = String(formData.get("kategori") ?? "").trim();
+
+  if (!nama) {
+    return { error: "Isi nama produk dulu sebelum membuat deskripsi." };
+  }
+
+  try {
+    const deskripsi = await buatDeskripsiDenganGemini({ nama, kategori });
+    return { deskripsi };
+  } catch (error) {
+    if (error.code === "KUNCI_KOSONG") {
+      return {
+        error: "Fitur AI belum dikonfigurasi. Isi GEMINI_API_KEY di server.",
+      };
+    }
+
+    if (error.code === "TIMEOUT") {
+      return { error: "Gemini terlalu lama merespons. Coba lagi." };
+    }
+
+    if (error.code === "KUOTA") {
+      return {
+        error: "Kuota Gemini sedang habis. Coba lagi nanti atau isi deskripsi manual.",
+      };
+    }
+
+    if (error.code === "MODEL") {
+      return {
+        error: "Model Gemini belum tersedia. Periksa GEMINI_MODEL di server.",
+      };
+    }
+
+    if (error.code === "DIBLOKIR") {
+      return {
+        error: "Permintaan diblokir Gemini. Ubah nama atau kategori produk.",
+      };
+    }
+
+    console.error("Gagal membuat deskripsi AI:", error.message);
+    return {
+      error: "Deskripsi belum bisa dibuat. Coba lagi atau isi deskripsi manual.",
+    };
+  }
 }
 
 export async function simpanProduk(_keadaan, formData) {
