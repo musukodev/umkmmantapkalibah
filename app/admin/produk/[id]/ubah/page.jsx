@@ -12,20 +12,42 @@ export default async function HalamanUbahProduk({ params }) {
   }
 
   let produk = null;
+  let kategoriList = [];
   let pesanError = "";
 
   try {
-    const { data, error } = await supabase
-      .from("produk")
-      .select("id, nama, harga, deskripsi, foto_url, kategori")
-      .eq("id", id)
-      .maybeSingle();
+    const [resProduk, resFoto, resVarian, resKategori] = await Promise.all([
+      supabase.from("produk").select("*").eq("id", id).maybeSingle(),
+      supabase
+        .from("foto_produk")
+        .select("url")
+        .eq("produk_id", id)
+        .order("urutan", { ascending: true }),
+      supabase
+        .from("varian_produk")
+        .select("nama, harga")
+        .eq("produk_id", id)
+        .order("urutan", { ascending: true }),
+      supabase.from("kategori").select("nama").order("nama"),
+    ]);
 
-    if (error) {
-      throw error;
+    if (resProduk.error) {
+      throw resProduk.error;
     }
 
-    produk = data;
+    if (resProduk.data) {
+      produk = {
+        ...resProduk.data,
+        foto_tambahan: (resFoto.data ?? []).map((f) => f.url).join("\n"),
+        varian_teks: (resVarian.data ?? [])
+          .map((v) => `${v.nama}: ${v.harga}`)
+          .join("\n"),
+      };
+    }
+
+    if (resKategori.data && resKategori.data.length > 0) {
+      kategoriList = resKategori.data.map((k) => k.nama);
+    }
   } catch (error) {
     console.error("Gagal mengambil produk untuk diubah:", error.message);
     pesanError = "Data produk belum bisa dimuat. Coba muat ulang halaman ini.";
@@ -51,7 +73,11 @@ export default async function HalamanUbahProduk({ params }) {
     <div className="flex flex-col gap-6 py-8">
       <NavAdmin />
       <h1 className="text-2xl font-extrabold">Ubah produk</h1>
-      <FormProduk produk={produk} labelTombol="Simpan perubahan" />
+      <FormProduk
+        produk={produk}
+        labelTombol="Simpan perubahan"
+        kategoriList={kategoriList}
+      />
     </div>
   );
 }

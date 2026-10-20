@@ -1,9 +1,11 @@
 import Link from "next/link";
 import TautanKeranjang from "@/components/TautanKeranjang";
 import ThemeToggle from "@/components/ThemeToggle";
-import { toko } from "@/lib/toko";
+import { ambilPengaturanToko } from "@/lib/pengaturan";
 
-export default function Header() {
+export default async function Header() {
+  const toko = await ambilPengaturanToko();
+
   return (
     <header className="border-b border-garis bg-latar">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-4">

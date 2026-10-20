@@ -493,8 +493,62 @@ Komponen `TanyaProduk` pada detail produk mengirim pertanyaan ke Server Action `
 Dipasang honeypot anti-bot dan pembatas laju (rate limiting) berbasis IP (maksimal 5 pertanyaan per 10 menit) di sisi server.
 
 
+## US-18 hingga US-48 (Batch Skema Database Lengkap)
+
+### US-18 Galeri beberapa foto produk
+- Menambahkan tabel `foto_produk` (`produk_id, url, urutan`).
+- Komponen `GaleriFoto` di halaman detail produk menampilkan foto utama dan daftar thumbnail interaktif.
+
+### US-19 Status stok produk
+- Menambahkan kolom `stok` pada tabel `produk`.
+- Produk dengan stok habis (0) menampilkan badge "Habis", menonaktifkan tombol WhatsApp dan tombol keranjang belanja.
+
+### US-20 Harga diskon dan badge produk
+- Menambahkan kolom `harga_diskon` dan `badge` pada tabel `produk`.
+- Menampilkan harga coret dan harga diskon khusus serta label badge kustom di kartu katalog dan detail produk.
+
+### US-31 Manajemen kategori admin
+- Menambahkan tabel `kategori` dan halaman `/admin/kategori` untuk menambah, mengubah, dan menghapus kategori dengan otentikasi admin server.
+
+### US-32 Nonaktifkan produk
+- Menambahkan kolom `aktif` pada tabel `produk`.
+- Produk nonaktif disembunyikan dari katalog publik dan mengembalikan respons 404 (Not Found) jika tautannya diakses langsung.
+
+### US-38 Ulasan dan rating produk
+- Menambahkan tabel `ulasan` (`produk_id, nama, rating, komentar, tampil`).
+- Form ulasan di halaman detail produk dilengkapi validasi server, proteksi honeypot spam, dan pembatasan laju IP.
+
+### US-39 Moderasi ulasan di admin
+- Menambahkan halaman `/admin/ulasan` untuk melihat semua ulasan, menyembunyikan/menampilkan ulasan, serta menghapus ulasan yang tidak pantas.
+
+### US-40 Statistik klik tombol WhatsApp
+- Menambahkan tabel `klik_whatsapp` dan endpoint `POST /api/klik-wa` untuk mencatat metrik konversi klik pesanan tanpa mengganggu alur pengunjung dan tanpa menyimpan data pribadi.
+
+### US-41 Produk terpopuler di admin
+- Dashboard admin `/admin` menampilkan 5 produk paling banyak diklik ke WhatsApp beserta total klik. Menampilkan pesan informatif jika belum ada klik.
+
+### US-42 Banner promosi beranda
+- Menambahkan tabel `banner` dan halaman manajemen `/admin/banner`.
+- Banner aktif otomatis tampil di bagian atas katalog beranda publik.
+
+### US-43 Pengaturan toko dari database
+- Menambahkan tabel `pengaturan_toko` dan halaman `/admin/pengaturan`.
+- Nama usaha, nomor WhatsApp, jam buka, dan alamat tersinkronisasi dinamis ke Header, Footer, Halaman Tentang, dan link WhatsApp.
+
+### US-45 Log aktivitas admin
+- Menambahkan tabel `log_admin` dan halaman `/admin/log`.
+- Setiap aksi modifikasi produk, kategori, ulasan, banner, dan pengaturan toko dicatat beserta identitas admin dan stempel waktu.
+
+### US-47 Urutan produk manual
+- Menambahkan kolom `urutan` pada tabel `produk`.
+- Admin dapat mengatur prioritas urutan tampil produk di katalog beranda dan halaman kategori.
+
+### US-48 Varian produk
+- Menambahkan tabel `varian_produk` (`produk_id, nama, harga, urutan`).
+- Pengunjung dapat memilih ukuran/varian pada halaman detail produk, harga terbarui otomatis, dan nama varian disertakan ke pesan WhatsApp.
+
 ## Debugging dan fitur bonus
 
 Pengujian US-07 sampai US-10 memakai akun uji sementara di Supabase Auth: menambah produk, mengubahnya, menghapusnya, dan memastikan aksi tanpa login ditolak. Produk dan akun uji sudah dihapus kembali; akun admin asli tidak diubah.
 
-US-11 diuji dengan pencarian “kopi”, filter kategori “Minuman”, kombinasi keduanya, dan kata kunci tanpa hasil. US-12 diuji dari HTML detail produk: jumlah awal 1, total harga, dan pesan WhatsApp sudah memuat jumlah. US-13 diuji dengan memastikan `/manifest.webmanifest` bertipe `application/manifest+json`, ikon 192/512 dapat diakses, service worker dapat diakses, dan `<link rel="manifest">` ada di halaman. US-14 diuji sampai jalur error `GEMINI_API_KEY` kosong; generasi sungguhan perlu diuji setelah key diisi di server.
+US-11 diuji dengan pencarian “kopi”, filter kategori “Minuman”, kombinasi keduanya, dan kata kunci tanpa hasil. US-12 diuji dari HTML detail produk: jumlah awal 1, total harga, dan pesan WhatsApp sudah memuat jumlah. US-13 diuji dengan memastikan `/manifest.webmanifest` bertipe `application/manifest+json`, ikon 192/512 dapat diakses, service worker dapat diakses, dan `<link rel="manifest">` ada di halaman. US-14 diuji sampai jalur error `GEMINI_API_KEY` kosong; generasi sungguhan perlu diuji setelah key diisi di server. Seluruh 14 fitur skema (US-18, 19, 20, 31, 32, 38, 39, 40, 41, 42, 43, 45, 47, 48) teruji dan lulus build Next.js 16 tanpa error.

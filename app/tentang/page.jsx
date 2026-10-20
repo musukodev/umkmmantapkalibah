@@ -1,13 +1,18 @@
 import Link from "next/link";
 import Tombol from "@/components/Tombol";
-import { toko } from "@/lib/toko";
+import { ambilPengaturanToko } from "@/lib/pengaturan";
 
-export const metadata = {
-  title: `Tentang ${toko.nama}`,
-  description: `Kenali ${toko.nama}, ${toko.tagline}. ${toko.alamat}.`,
-};
+export async function generateMetadata() {
+  const toko = await ambilPengaturanToko();
+  return {
+    title: `Tentang ${toko.nama}`,
+    description: `Kenali ${toko.nama}, ${toko.tagline}. ${toko.alamat}.`,
+  };
+}
 
-export default function HalamanTentang() {
+export default async function HalamanTentang() {
+  const toko = await ambilPengaturanToko();
+
   return (
     <div className="mx-auto max-w-3xl py-10 sm:py-14">
       <p className="text-sm font-semibold uppercase tracking-wide text-utama">

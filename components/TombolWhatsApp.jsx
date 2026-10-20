@@ -7,23 +7,67 @@ import { toko } from "@/lib/toko";
 
 const JUMLAH_MAKS = 99;
 
-export default function TombolWhatsApp({ produk }) {
+export default function TombolWhatsApp({
+  produk,
+  nomorWhatsApp,
+  varianDipilih,
+}) {
   const [jumlah, setJumlah] = useState(1);
   const [pesanKeranjang, setPesanKeranjang] = useState("");
   const { tambah } = useKeranjang();
+
+  const nomor = nomorWhatsApp || toko.nomorWhatsApp;
+  const stokHabis =
+    produk.stok !== undefined &&
+    produk.stok !== null &&
+    Number(produk.stok) <= 0;
+
+  const hargaPerItem =
+    varianDipilih?.harga !== undefined && varianDipilih?.harga !== null
+      ? Number(varianDipilih.harga)
+      : produk.harga_diskon !== undefined &&
+        produk.harga_diskon !== null &&
+        Number(produk.harga_diskon) > 0
+      ? Number(produk.harga_diskon)
+      : Number(produk.harga);
+
   const jumlahAman =
     typeof jumlah === "number" && jumlah >= 1 ? Math.min(jumlah, JUMLAH_MAKS) : 1;
-  const total = produk.harga * jumlahAman;
-  const hargaSatuan = formatRupiah(produk.harga).replace(/\u00a0/g, " ");
+  const total = hargaPerItem * jumlahAman;
+  const hargaSatuan = formatRupiah(hargaPerItem).replace(/\u00a0/g, " ");
   const totalTeks = formatRupiah(total).replace(/\u00a0/g, " ");
-  const pesan = `Halo, saya mau pesan ${produk.nama} sebanyak ${jumlahAman} (${hargaSatuan} per item, total ${totalTeks})`;
-  const tautan = `https://wa.me/${toko.nomorWhatsApp}?text=${encodeURIComponent(pesan)}`;
+
+  const namaLengkap = varianDipilih?.nama
+    ? `${produk.nama} (${varianDipilih.nama})`
+    : produk.nama;
+
+  const pesan = `Halo, saya mau pesan ${namaLengkap} sebanyak ${jumlahAman} (${hargaSatuan} per item, total ${totalTeks})`;
+  const tautan = `https://wa.me/${nomor}?text=${encodeURIComponent(pesan)}`;
+
+  function catatKlik() {
+    try {
+      fetch("/api/klik-wa", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ produkId: produk.id }),
+        keepalive: true,
+      }).catch(() => {});
+    } catch {
+      // Tidak menghambat pengalihan ke WhatsApp.
+    }
+  }
 
   function tambahKeKeranjang() {
-    tambah(produk, jumlahAman);
-    setPesanKeranjang(
-      `${jumlahAman} ${produk.nama} ditambahkan ke keranjang.`
+    if (stokHabis) return;
+    tambah(
+      {
+        ...produk,
+        nama: namaLengkap,
+        harga: hargaPerItem,
+      },
+      jumlahAman
     );
+    setPesanKeranjang(`${jumlahAman} ${namaLengkap} ditambahkan ke keranjang.`);
   }
 
   return (
@@ -37,7 +81,7 @@ export default function TombolWhatsApp({ produk }) {
             type="button"
             aria-label="Kurangi jumlah"
             onClick={() => setJumlah(Math.max(1, jumlahAman - 1))}
-            disabled={jumlahAman <= 1}
+            disabled={stokHabis || jumlahAman <= 1}
             className="px-3 py-2.5 text-lg font-semibold text-teks-lembut transition-colors hover:text-utama disabled:cursor-not-allowed disabled:opacity-40"
           >
             −
@@ -50,6 +94,7 @@ export default function TombolWhatsApp({ produk }) {
             max={JUMLAH_MAKS}
             inputMode="numeric"
             value={jumlah}
+            disabled={stokHabis}
             onChange={(event) => {
               const mentah = event.target.value;
 
@@ -69,13 +114,13 @@ export default function TombolWhatsApp({ produk }) {
                 setJumlah(1);
               }
             }}
-            className="w-14 border-x border-garis bg-transparent py-2.5 text-center text-base font-semibold text-teks focus:outline-none"
+            className="w-14 border-x border-garis bg-transparent py-2.5 text-center text-base font-semibold text-teks focus:outline-none disabled:opacity-50"
           />
           <button
             type="button"
             aria-label="Tambah jumlah"
             onClick={() => setJumlah(Math.min(JUMLAH_MAKS, jumlahAman + 1))}
-            disabled={jumlahAman >= JUMLAH_MAKS}
+            disabled={stokHabis || jumlahAman >= JUMLAH_MAKS}
             className="px-3 py-2.5 text-lg font-semibold text-teks-lembut transition-colors hover:text-utama disabled:cursor-not-allowed disabled:opacity-40"
           >
             +
@@ -84,25 +129,46 @@ export default function TombolWhatsApp({ produk }) {
       </div>
 
       <div className="flex flex-col gap-2 sm:items-end">
-        <p className="text-sm text-teks-lembut">
-          Total <span className="text-base font-bold text-harga">{totalTeks}</span>
-        </p>
+        <div className="flex items-center gap-2">
+          {stokHabis ? (
+            <span className="rounded bg-bahaya px-2 py-0.5 text-xs font-bold text-white">
+              Stok Habis
+            </span>
+          ) : (
+            <p className="text-sm text-teks-lembut">
+              Total{" "}
+              <span className="text-base font-bold text-harga">{totalTeks}</span>
+            </p>
+          )}
+        </div>
         <div className="flex flex-col gap-2 sm:flex-row">
           <button
             type="button"
             onClick={tambahKeKeranjang}
-            className="inline-flex w-full items-center justify-center rounded-lg border border-garis bg-latar px-4 py-3 font-semibold text-teks transition-colors hover:border-utama hover:text-utama sm:w-auto"
+            disabled={stokHabis}
+            className="inline-flex w-full items-center justify-center rounded-lg border border-garis bg-latar px-4 py-3 font-semibold text-teks transition-colors hover:border-utama hover:text-utama disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
           >
             Tambah ke keranjang
           </button>
-          <a
-            href={tautan}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex w-full items-center justify-center rounded-lg bg-utama px-5 py-3 font-semibold text-latar hover:bg-utama-gelap sm:w-auto"
-          >
-            Pesan via WhatsApp
-          </a>
+          {stokHabis ? (
+            <button
+              type="button"
+              disabled
+              className="inline-flex w-full cursor-not-allowed items-center justify-center rounded-lg bg-permukaan px-5 py-3 font-semibold text-teks-lembut opacity-60 sm:w-auto"
+            >
+              Stok Habis
+            </button>
+          ) : (
+            <a
+              href={tautan}
+              onClick={catatKlik}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex w-full items-center justify-center rounded-lg bg-utama px-5 py-3 font-semibold text-latar hover:bg-utama-gelap sm:w-auto"
+            >
+              Pesan via WhatsApp
+            </a>
+          )}
         </div>
         {pesanKeranjang ? (
           <p role="status" aria-live="polite" className="text-sm text-utama">

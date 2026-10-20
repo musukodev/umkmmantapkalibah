@@ -5,7 +5,7 @@ import { useKeranjang } from "@/components/KeranjangProvider";
 import { formatRupiah } from "@/lib/format";
 import { toko } from "@/lib/toko";
 
-export default function IsiKeranjang() {
+export default function IsiKeranjang({ nomorWhatsApp }) {
   const { items, siap, jumlahItem, totalHarga, aturJumlah, hapus, kosongkan } =
     useKeranjang();
 
@@ -45,7 +45,8 @@ export default function IsiKeranjang() {
     .join("\n");
   const totalTeks = formatRupiah(totalHarga).replace(/\u00a0/g, " ");
   const pesan = `Halo, saya mau pesan:\n${rincian}\n\nTotal: ${totalTeks}`;
-  const tautan = `https://wa.me/${toko.nomorWhatsApp}?text=${encodeURIComponent(pesan)}`;
+  const nomor = nomorWhatsApp || toko.nomorWhatsApp;
+  const tautan = `https://wa.me/${nomor}?text=${encodeURIComponent(pesan)}`;
 
   function kosongkanKeranjang() {
     if (window.confirm("Kosongkan semua produk dari keranjang?")) {

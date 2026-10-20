@@ -3,6 +3,7 @@ import Paginasi from "@/components/Paginasi";
 import TabelProduk from "@/components/TabelProduk";
 import Tombol from "@/components/Tombol";
 import Input from "@/components/Input";
+import { formatRupiah } from "@/lib/format";
 import { wajibAdmin } from "@/lib/auth";
 
 const PRODUK_PER_HALAMAN = 10;
@@ -23,6 +24,8 @@ export default async function HalamanAdmin({ searchParams }) {
   let totalHalaman = 0;
   let halamanTidakAda = false;
   let pesanError = "";
+  let produkTerpopuler = [];
+  let totalKlikWa = 0;
 
   try {
     let queryHitung = supabase
@@ -34,9 +37,10 @@ export default async function HalamanAdmin({ searchParams }) {
       queryHitung = queryHitung.ilike("nama", `%${pola}%`);
     }
 
-    const [hasilHitung, hasilRingkasan] = await Promise.all([
+    const [hasilHitung, hasilRingkasan, hasilKlik] = await Promise.all([
       queryHitung,
-      supabase.from("produk").select("kategori"),
+      supabase.from("produk").select("id, nama, kategori"),
+      supabase.from("klik_whatsapp").select("produk_id"),
     ]);
 
     if (hasilHitung.error) {
@@ -47,23 +51,37 @@ export default async function HalamanAdmin({ searchParams }) {
     totalHalaman = Math.ceil(jumlahTotal / PRODUK_PER_HALAMAN);
     halamanTidakAda = totalHalaman > 0 && halaman > totalHalaman;
 
-    if (hasilRingkasan.error) {
-      console.error(
-        "Gagal mengambil ringkasan produk:",
-        hasilRingkasan.error.message
-      );
-    } else {
+    const mapProduk = new Map();
+    if (hasilRingkasan.data) {
+      totalProduk = hasilRingkasan.data.length;
       const ringkasan = new Map();
-      totalProduk = (hasilRingkasan.data ?? []).length;
 
-      for (const produk of hasilRingkasan.data ?? []) {
-        const kategori = produk.kategori || "Tanpa kategori";
-        ringkasan.set(kategori, (ringkasan.get(kategori) ?? 0) + 1);
+      for (const p of hasilRingkasan.data) {
+        mapProduk.set(p.id, p);
+        const k = p.kategori || "Tanpa kategori";
+        ringkasan.set(k, (ringkasan.get(k) ?? 0) + 1);
       }
 
       kategoriRingkas = [...ringkasan.entries()]
         .map(([nama, jumlah]) => ({ nama, jumlah }))
         .sort((a, b) => b.jumlah - a.jumlah || a.nama.localeCompare(b.nama, "id"));
+    }
+
+    if (hasilKlik.data) {
+      totalKlikWa = hasilKlik.data.length;
+      const frekuensi = new Map();
+      for (const klik of hasilKlik.data) {
+        frekuensi.set(klik.produk_id, (frekuensi.get(klik.produk_id) ?? 0) + 1);
+      }
+
+      produkTerpopuler = [...frekuensi.entries()]
+        .map(([produkId, jumlahKlik]) => ({
+          produkId,
+          jumlahKlik,
+          nama: mapProduk.get(produkId)?.nama || `Produk #${produkId}`,
+        }))
+        .sort((a, b) => b.jumlahKlik - a.jumlahKlik)
+        .slice(0, 5);
     }
 
     if (!halamanTidakAda && jumlahTotal > 0) {
@@ -72,7 +90,7 @@ export default async function HalamanAdmin({ searchParams }) {
 
       let queryProduk = supabase
         .from("produk")
-        .select("id, nama, harga, kategori, foto_url");
+        .select("id, nama, harga, kategori, foto_url, stok, harga_diskon, badge, aktif, urutan");
 
       if (kataKunci) {
         const pola = kataKunci.replace(/[\\%_]/g, "\\$&");
@@ -80,6 +98,7 @@ export default async function HalamanAdmin({ searchParams }) {
       }
 
       const { data, error } = await queryProduk
+        .order("urutan", { ascending: true })
         .order("created_at", { ascending: false })
         .order("id", { ascending: true })
         .range(dari, sampai);
@@ -133,31 +152,62 @@ export default async function HalamanAdmin({ searchParams }) {
         </p>
       ) : null}
 
-      <section aria-labelledby="ringkasan-produk" className="flex flex-col gap-3">
-        <h2
-          id="ringkasan-produk"
-          className="text-sm font-semibold uppercase tracking-wide text-teks-lembut"
-        >
-          Ringkasan
-        </h2>
-        <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          <div className="rounded-2xl border border-garis bg-latar p-4">
-            <p className="text-sm text-teks-lembut">Total produk</p>
-            <p className="mt-1 text-3xl font-extrabold text-utama">
-              {totalProduk}
-            </p>
-          </div>
-          {kategoriRingkas.map((kategori) => (
-            <div
-              key={kategori.nama}
-              className="rounded-2xl border border-garis bg-permukaan p-4"
-            >
-              <p className="text-sm text-teks-lembut">{kategori.nama}</p>
-              <p className="mt-1 text-2xl font-bold">{kategori.jumlah}</p>
+      <div className="grid gap-6 lg:grid-cols-3">
+        <section aria-labelledby="ringkasan-produk" className="flex flex-col gap-3 lg:col-span-2">
+          <h2
+            id="ringkasan-produk"
+            className="text-sm font-semibold uppercase tracking-wide text-teks-lembut"
+          >
+            Ringkasan Produk ({totalProduk})
+          </h2>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border border-garis bg-latar p-4">
+              <p className="text-sm text-teks-lembut">Total produk</p>
+              <p className="mt-1 text-3xl font-extrabold text-utama">
+                {totalProduk}
+              </p>
             </div>
-          ))}
-        </div>
-      </section>
+            {kategoriRingkas.slice(0, 5).map((kategori) => (
+              <div
+                key={kategori.nama}
+                className="rounded-2xl border border-garis bg-permukaan p-4"
+              >
+                <p className="text-sm text-teks-lembut truncate">{kategori.nama}</p>
+                <p className="mt-1 text-2xl font-bold">{kategori.jumlah}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section aria-labelledby="populer-wa" className="flex flex-col gap-3">
+          <h2
+            id="populer-wa"
+            className="text-sm font-semibold uppercase tracking-wide text-teks-lembut"
+          >
+            Produk Terpopuler (Klik WhatsApp: {totalKlikWa})
+          </h2>
+          <div className="flex flex-col gap-2 rounded-2xl border border-garis bg-permukaan p-4">
+            {produkTerpopuler.length === 0 ? (
+              <p className="py-4 text-center text-sm text-teks-lembut">
+                Belum ada data klik WhatsApp.
+              </p>
+            ) : (
+              <ol className="flex flex-col divide-y divide-garis text-sm">
+                {produkTerpopuler.map((item, indeks) => (
+                  <li key={item.produkId} className="flex items-center justify-between py-2">
+                    <span className="truncate pr-2 font-semibold">
+                      {indeks + 1}. {item.nama}
+                    </span>
+                    <span className="shrink-0 rounded bg-utama/15 px-2 py-0.5 text-xs font-bold text-utama">
+                      {item.jumlahKlik} klik
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
+        </section>
+      </div>
 
       <form
         action="/admin"
@@ -199,22 +249,21 @@ export default async function HalamanAdmin({ searchParams }) {
         </div>
       ) : (
         <>
-          <p className="text-sm text-teks-lembut" aria-live="polite">
-            {jumlahTotal} produk
-            {kataKunci ? " cocok dengan pencarian." : " tersedia."}
-            {totalHalaman > 1
-              ? ` Halaman ${halaman} dari ${totalHalaman}.`
-              : ""}
-          </p>
           <TabelProduk
             daftarProduk={daftarProduk}
             adaPencarian={Boolean(kataKunci)}
           />
+
           <Paginasi
-            basePath="/admin"
             halaman={halaman}
             totalHalaman={totalHalaman}
-            params={{ q: kataKunci }}
+            bangunTautan={(target) => {
+              const params = new URLSearchParams();
+              if (kataKunci) params.set("q", kataKunci);
+              if (target > 1) params.set("halaman", String(target));
+              const string = params.toString();
+              return string ? `/admin?${string}` : "/admin";
+            }}
           />
         </>
       )}

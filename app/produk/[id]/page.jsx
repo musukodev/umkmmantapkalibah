@@ -1,16 +1,17 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache } from "react";
+import BagianPesanDetail from "@/components/BagianPesanDetail";
+import BagianUlasan from "@/components/BagianUlasan";
 import BagikanProduk from "@/components/BagikanProduk";
 import CatatTerakhirDilihat from "@/components/CatatTerakhirDilihat";
+import GaleriFoto from "@/components/GaleriFoto";
 import KartuProduk from "@/components/KartuProduk";
 import TanyaProduk from "@/components/TanyaProduk";
 import TombolFavorit from "@/components/TombolFavorit";
-import TombolWhatsApp from "@/components/TombolWhatsApp";
-import { formatRupiah } from "@/lib/format";
+import { ambilPengaturanToko } from "@/lib/pengaturan";
 import { slugify } from "@/lib/slug";
 import { buatKlienServer } from "@/lib/supabase/server";
-import { toko } from "@/lib/toko";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,7 @@ const ambilProduk = cache(async (id) => {
   const supabase = buatKlienServer();
   const { data, error } = await supabase
     .from("produk")
-    .select("id, nama, harga, deskripsi, foto_url, kategori")
+    .select("id, nama, harga, deskripsi, foto_url, kategori, stok, harga_diskon, badge, aktif")
     .eq("id", id)
     .maybeSingle();
 
@@ -31,6 +32,7 @@ const ambilProduk = cache(async (id) => {
 
 export async function generateMetadata({ params }) {
   const { id } = await params;
+  const toko = await ambilPengaturanToko();
 
   if (!/^\d+$/.test(id)) {
     return { title: `Produk tidak ditemukan — ${toko.nama}` };
@@ -39,7 +41,7 @@ export async function generateMetadata({ params }) {
   try {
     const produk = await ambilProduk(id);
 
-    if (!produk) {
+    if (!produk || produk.aktif === false) {
       return { title: `Produk tidak ditemukan — ${toko.nama}` };
     }
 
@@ -86,11 +88,49 @@ export default async function HalamanDetailProduk({ params }) {
   }
 
   let produk = null;
+  let daftarFoto = [];
+  let daftarVarian = [];
+  let daftarUlasan = [];
   let produkTerkait = [];
   let pesanError = "";
+  let toko = { nama: "Terpal B", nomorWhatsApp: "6281378280892" };
 
   try {
-    produk = await ambilProduk(id);
+    const [dataProduk, dataToko] = await Promise.all([
+      ambilProduk(id),
+      ambilPengaturanToko(),
+    ]);
+
+    produk = dataProduk;
+    toko = dataToko;
+
+    if (produk && produk.aktif !== false) {
+      const supabase = buatKlienServer();
+      const [hasilFoto, hasilVarian, hasilUlasan] = await Promise.all([
+        supabase
+          .from("foto_produk")
+          .select("id, url, urutan")
+          .eq("produk_id", produk.id)
+          .order("urutan", { ascending: true })
+          .order("id", { ascending: true }),
+        supabase
+          .from("varian_produk")
+          .select("id, nama, harga, urutan")
+          .eq("produk_id", produk.id)
+          .order("urutan", { ascending: true })
+          .order("id", { ascending: true }),
+        supabase
+          .from("ulasan")
+          .select("id, nama, rating, komentar, created_at")
+          .eq("produk_id", produk.id)
+          .eq("tampil", true)
+          .order("created_at", { ascending: false }),
+      ]);
+
+      daftarFoto = hasilFoto.data ?? [];
+      daftarVarian = hasilVarian.data ?? [];
+      daftarUlasan = hasilUlasan.data ?? [];
+    }
   } catch (error) {
     console.error("Gagal mengambil detail produk:", error.message);
     pesanError = "Detail produk belum bisa dimuat. Coba muat ulang halaman ini.";
@@ -110,7 +150,7 @@ export default async function HalamanDetailProduk({ params }) {
     );
   }
 
-  if (!produk) {
+  if (!produk || produk.aktif === false) {
     notFound();
   }
 
@@ -119,8 +159,9 @@ export default async function HalamanDetailProduk({ params }) {
       const supabase = buatKlienServer();
       const { data, error } = await supabase
         .from("produk")
-        .select("id, nama, harga, deskripsi, foto_url, kategori")
+        .select("id, nama, harga, deskripsi, foto_url, kategori, stok, harga_diskon, badge, aktif")
         .eq("kategori", produk.kategori)
+        .eq("aktif", true)
         .neq("id", produk.id)
         .order("created_at", { ascending: false })
         .order("id", { ascending: true })
@@ -136,38 +177,65 @@ export default async function HalamanDetailProduk({ params }) {
     }
   }
 
-  const foto = produk.foto_url || "/produk/tanpa-foto.svg";
+  const stokHabis =
+    produk.stok !== undefined &&
+    produk.stok !== null &&
+    Number(produk.stok) <= 0;
 
   return (
     <>
       <CatatTerakhirDilihat produk={produk} />
       <article className="grid gap-8 py-8 md:grid-cols-2 md:py-12">
-        <img
-          src={foto}
+        <GaleriFoto
+          fotoUtama={produk.foto_url}
+          daftarFoto={daftarFoto}
           alt={produk.nama}
-          className="aspect-square w-full rounded-2xl border border-garis bg-permukaan object-cover"
         />
         <div className="flex flex-col gap-4">
           <Link href="/" className="text-sm text-teks-lembut underline underline-offset-4 hover:text-utama">
             Kembali ke katalog
           </Link>
-          {produk.kategori ? (
-            <Link
-              href={`/kategori/${slugify(produk.kategori)}`}
-              className="self-start text-sm font-semibold text-utama underline underline-offset-4"
-            >
-              {produk.kategori}
-            </Link>
-          ) : (
-            <p className="text-sm text-teks-lembut">Tanpa kategori</p>
-          )}
+
+          <div className="flex flex-wrap items-center gap-2">
+            {produk.kategori ? (
+              <Link
+                href={`/kategori/${slugify(produk.kategori)}`}
+                className="self-start text-sm font-semibold text-utama underline underline-offset-4"
+              >
+                {produk.kategori}
+              </Link>
+            ) : (
+              <p className="text-sm text-teks-lembut">Tanpa kategori</p>
+            )}
+
+            {stokHabis ? (
+              <span className="rounded bg-bahaya px-2 py-0.5 text-xs font-bold text-white">
+                Stok Habis
+              </span>
+            ) : produk.badge ? (
+              <span className="rounded bg-utama px-2 py-0.5 text-xs font-bold text-latar">
+                {produk.badge}
+              </span>
+            ) : null}
+          </div>
+
           <h1 className="text-3xl font-extrabold leading-tight tracking-tight">{produk.nama}</h1>
-          <p className="self-start rounded-md bg-harga-latar px-3 py-1 text-xl font-bold text-harga">
-            {formatRupiah(produk.harga)}
-          </p>
+
+          {produk.stok !== undefined && produk.stok !== null ? (
+            <p className="text-xs text-teks-lembut">
+              Sisa stok: <span className="font-semibold text-teks">{produk.stok} unit</span>
+            </p>
+          ) : null}
+
+          <BagianPesanDetail
+            produk={produk}
+            daftarVarian={daftarVarian}
+            nomorWhatsApp={toko.nomorWhatsApp}
+          />
+
           <p className="max-w-prose leading-relaxed text-teks-lembut">{produk.deskripsi}</p>
-          <TombolWhatsApp produk={produk} />
-          <div className="flex flex-wrap items-center gap-3">
+
+          <div className="flex flex-wrap items-center gap-3 pt-2">
             <TombolFavorit produk={produk} />
             <BagikanProduk judul={produk.nama} />
             <Link
@@ -181,6 +249,8 @@ export default async function HalamanDetailProduk({ params }) {
       </article>
 
       <TanyaProduk produkId={produk.id} />
+
+      <BagianUlasan produkId={produk.id} daftarUlasan={daftarUlasan} />
 
       {produkTerkait.length > 0 ? (
         <section

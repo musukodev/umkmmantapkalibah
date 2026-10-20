@@ -13,6 +13,7 @@ const ambilKategori = cache(async (slug) => {
   const { data, error } = await supabase
     .from("produk")
     .select("kategori")
+    .eq("aktif", true)
     .not("kategori", "is", null);
 
   if (error) {
@@ -67,8 +68,10 @@ export default async function HalamanKategori({ params }) {
       const supabase = buatKlienServer();
       const { data, error } = await supabase
         .from("produk")
-        .select("id, nama, harga, deskripsi, foto_url, kategori")
+        .select("id, nama, harga, deskripsi, foto_url, kategori, stok, harga_diskon, badge, aktif")
         .eq("kategori", kategori)
+        .eq("aktif", true)
+        .order("urutan", { ascending: true })
         .order("created_at", { ascending: false })
         .order("id", { ascending: true });
 

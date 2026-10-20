@@ -6,6 +6,7 @@ import { buatKlienSesi } from "@/lib/supabase/ssr";
 import { buatKlienServer } from "@/lib/supabase/server";
 import { wajibAdmin } from "@/lib/auth";
 import { buatDeskripsiDenganGemini } from "@/lib/gemini";
+import { catatLogAdmin } from "@/lib/log";
 
 const TIPE_FOTO = {
   "image/jpeg": "jpg",
@@ -20,8 +21,15 @@ function bacaNilaiProduk(formData) {
     id: String(formData.get("id") ?? "").trim(),
     nama: String(formData.get("nama") ?? "").trim(),
     harga: String(formData.get("harga") ?? "").trim(),
+    harga_diskon: String(formData.get("harga_diskon") ?? "").trim(),
+    stok: String(formData.get("stok") ?? "").trim(),
+    badge: String(formData.get("badge") ?? "").trim(),
+    urutan: String(formData.get("urutan") ?? "").trim(),
+    aktif: formData.get("aktif") === "on" || formData.get("aktif") === "true",
     kategori: String(formData.get("kategori") ?? "").trim(),
     foto_url: String(formData.get("foto_url") ?? "").trim(),
+    foto_tambahan: String(formData.get("foto_tambahan") ?? "").trim(),
+    varian_teks: String(formData.get("varian_teks") ?? "").trim(),
     deskripsi: String(formData.get("deskripsi") ?? "").trim(),
   };
 }
@@ -59,7 +67,7 @@ export async function keluar() {
 }
 
 export async function gantiPassword(_keadaan, formData) {
-  const { supabase } = await wajibAdmin();
+  const { supabase, user } = await wajibAdmin();
 
   const passwordBaru = String(formData.get("password_baru") ?? "");
   const konfirmasi = String(formData.get("konfirmasi_password") ?? "");
@@ -82,6 +90,7 @@ export async function gantiPassword(_keadaan, formData) {
     return { error: "Password belum bisa diganti. Coba lagi beberapa saat lagi." };
   }
 
+  await catatLogAdmin(supabase, user, "GANTI_PASSWORD", "Password akun diubah");
   return { sukses: "Password berhasil diganti. Gunakan password baru saat masuk berikutnya." };
 }
 
@@ -198,7 +207,7 @@ export async function unggahFotoProduk(formData) {
 }
 
 export async function simpanProduk(_keadaan, formData) {
-  const { supabase } = await wajibAdmin();
+  const { supabase, user } = await wajibAdmin();
   const nilai = bacaNilaiProduk(formData);
   const fieldErrors = {};
 
@@ -216,6 +225,20 @@ export async function simpanProduk(_keadaan, formData) {
     }
   }
 
+  if (nilai.harga_diskon) {
+    const diskon = Number(nilai.harga_diskon);
+    if (!Number.isInteger(diskon) || diskon <= 0) {
+      fieldErrors.harga_diskon = "Harga diskon harus angka bulat positif.";
+    }
+  }
+
+  if (nilai.stok) {
+    const stok = Number(nilai.stok);
+    if (!Number.isInteger(stok) || stok < 0) {
+      fieldErrors.stok = "Stok harus angka bulat 0 atau lebih.";
+    }
+  }
+
   if (Object.keys(fieldErrors).length > 0) {
     return {
       error: "Periksa kembali isian yang ditandai.",
@@ -227,10 +250,17 @@ export async function simpanProduk(_keadaan, formData) {
   const data = {
     nama: nilai.nama,
     harga: Number(nilai.harga),
+    harga_diskon: nilai.harga_diskon ? Number(nilai.harga_diskon) : null,
+    stok: nilai.stok ? Number(nilai.stok) : 0,
+    badge: nilai.badge ? nilai.badge.slice(0, 30) : null,
+    urutan: nilai.urutan && !isNaN(Number(nilai.urutan)) ? Number(nilai.urutan) : 0,
+    aktif: Boolean(nilai.aktif),
     kategori: nilai.kategori || null,
     foto_url: nilai.foto_url || null,
     deskripsi: nilai.deskripsi || null,
   };
+
+  let idProduk = nilai.id;
 
   if (nilai.id) {
     if (!/^\d+$/.test(nilai.id)) {
@@ -254,8 +284,19 @@ export async function simpanProduk(_keadaan, formData) {
     if (!hasil) {
       return { error: "Produk tidak ditemukan. Mungkin sudah dihapus.", nilai };
     }
+
+    await catatLogAdmin(
+      supabase,
+      user,
+      "UBAH_PRODUK",
+      `${data.nama} (ID: ${nilai.id})`
+    );
   } else {
-    const { error } = await supabase.from("produk").insert(data);
+    const { data: hasil, error } = await supabase
+      .from("produk")
+      .insert(data)
+      .select("id")
+      .single();
 
     if (error) {
       return {
@@ -263,26 +304,102 @@ export async function simpanProduk(_keadaan, formData) {
         nilai,
       };
     }
+
+    idProduk = hasil.id;
+    await catatLogAdmin(
+      supabase,
+      user,
+      "TAMBAH_PRODUK",
+      `${data.nama} (ID: ${idProduk})`
+    );
+  }
+
+  // Sinkronisasi foto_produk tambahan
+  try {
+    await supabase.from("foto_produk").delete().eq("produk_id", idProduk);
+    const barisFoto = (nilai.foto_tambahan || "")
+      .split("\n")
+      .map((f) => f.trim())
+      .filter(Boolean);
+
+    if (barisFoto.length > 0) {
+      const recordsFoto = barisFoto.map((url, idx) => ({
+        produk_id: Number(idProduk),
+        url,
+        urutan: idx,
+      }));
+      await supabase.from("foto_produk").insert(recordsFoto);
+    }
+  } catch (errFoto) {
+    console.error("Gagal memperbarui foto_produk:", errFoto.message);
+  }
+
+  // Sinkronisasi varian_produk
+  try {
+    await supabase.from("varian_produk").delete().eq("produk_id", idProduk);
+    const barisVarian = (nilai.varian_teks || "")
+      .split("\n")
+      .map((v) => v.trim())
+      .filter(Boolean);
+
+    if (barisVarian.length > 0) {
+      const recordsVarian = [];
+      barisVarian.forEach((b, idx) => {
+        const pisah = b.split(/[:=]/);
+        if (pisah.length >= 2) {
+          const namaVarian = pisah[0].trim();
+          const hargaVarian = Number(pisah[1].replace(/[^\d]/g, ""));
+          if (namaVarian && !isNaN(hargaVarian) && hargaVarian > 0) {
+            recordsVarian.push({
+              produk_id: Number(idProduk),
+              nama: namaVarian,
+              harga: hargaVarian,
+              urutan: idx,
+            });
+          }
+        }
+      });
+      if (recordsVarian.length > 0) {
+        await supabase.from("varian_produk").insert(recordsVarian);
+      }
+    }
+  } catch (errVarian) {
+    console.error("Gagal memperbarui varian_produk:", errVarian.message);
   }
 
   revalidatePath("/");
   revalidatePath("/admin");
+  revalidatePath(`/produk/${idProduk}`);
   redirect("/admin?pesan=disimpan");
 }
 
 export async function hapusProduk(formData) {
-  const { supabase } = await wajibAdmin();
+  const { supabase, user } = await wajibAdmin();
   const id = String(formData.get("id") ?? "").trim();
 
   if (!/^\d+$/.test(id)) {
     redirect("/admin?pesan=gagal-hapus");
   }
 
+  // Ambil nama sebelum dihapus untuk log
+  const { data: p } = await supabase
+    .from("produk")
+    .select("nama")
+    .eq("id", id)
+    .maybeSingle();
+
   const { error } = await supabase.from("produk").delete().eq("id", id);
 
   if (error) {
     redirect("/admin?pesan=gagal-hapus");
   }
+
+  await catatLogAdmin(
+    supabase,
+    user,
+    "HAPUS_PRODUK",
+    `${p?.nama || "Produk"} (ID: ${id})`
+  );
 
   revalidatePath("/");
   revalidatePath("/admin");

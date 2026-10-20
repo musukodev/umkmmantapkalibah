@@ -9,9 +9,7 @@ import {
   unggahFotoProduk,
 } from "@/app/admin/actions";
 
-// Dipakai untuk tambah produk (US-08) dan ubah produk (US-09).
-// Nama field sama dengan kolom tabel "produk".
-export default function FormProduk({ produk = {}, labelTombol }) {
+export default function FormProduk({ produk = {}, labelTombol, kategoriList = [] }) {
   const [keadaan, aksi, sedangProses] = useActionState(simpanProduk, {});
   const [pesanAI, setPesanAI] = useState(null);
   const [sedangAI, mulaiAI] = useTransition();
@@ -101,6 +99,19 @@ export default function FormProduk({ produk = {}, labelTombol }) {
     <form ref={formRef} action={aksi} className="flex max-w-xl flex-col gap-4">
       {produk.id ? <input type="hidden" name="id" value={produk.id} /> : null}
 
+      <div className="flex items-center gap-3 rounded-lg border border-garis bg-permukaan p-3">
+        <input
+          id="aktif"
+          type="checkbox"
+          name="aktif"
+          defaultChecked={nilai.aktif ?? true}
+          className="h-4 w-4 rounded text-utama focus:ring-utama"
+        />
+        <label htmlFor="aktif" className="text-sm font-semibold">
+          Aktifkan produk di katalog publik
+        </label>
+      </div>
+
       <Input
         label="Nama produk"
         name="nama"
@@ -108,23 +119,79 @@ export default function FormProduk({ produk = {}, labelTombol }) {
         error={keadaan?.fieldErrors?.nama}
         required
       />
+
+      <div className="grid grid-cols-2 gap-3">
+        <Input
+          label="Harga normal (Rp)"
+          name="harga"
+          type="number"
+          min="1"
+          step="1"
+          defaultValue={nilai.harga ?? ""}
+          error={keadaan?.fieldErrors?.harga}
+          required
+        />
+        <Input
+          label="Harga diskon (Rp, opsional)"
+          name="harga_diskon"
+          type="number"
+          min="1"
+          step="1"
+          placeholder="Coret harga normal"
+          defaultValue={nilai.harga_diskon ?? ""}
+          error={keadaan?.fieldErrors?.harga_diskon}
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <Input
+          label="Jumlah stok"
+          name="stok"
+          type="number"
+          min="0"
+          step="1"
+          placeholder="10"
+          defaultValue={nilai.stok ?? 10}
+          error={keadaan?.fieldErrors?.stok}
+        />
+        <Input
+          label="Urutan tampil (angka)"
+          name="urutan"
+          type="number"
+          step="1"
+          placeholder="0 (lebih kecil lebih dulu)"
+          defaultValue={nilai.urutan ?? 0}
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <Input
+            label="Kategori"
+            name="kategori"
+            list="daftar-kategori"
+            placeholder="Pilih atau ketik kategori"
+            defaultValue={nilai.kategori ?? ""}
+          />
+          {kategoriList.length > 0 ? (
+            <datalist id="daftar-kategori">
+              {kategoriList.map((kat) => (
+                <option key={kat} value={kat} />
+              ))}
+            </datalist>
+          ) : null}
+        </div>
+        <Input
+          label="Badge (opsional)"
+          name="badge"
+          placeholder="Contoh: Baru, Terlaris, Promo"
+          maxLength={30}
+          defaultValue={nilai.badge ?? ""}
+        />
+      </div>
+
       <Input
-        label="Harga (Rp)"
-        name="harga"
-        type="number"
-        min="1"
-        step="1"
-        defaultValue={nilai.harga ?? ""}
-        error={keadaan?.fieldErrors?.harga}
-        required
-      />
-      <Input
-        label="Kategori"
-        name="kategori"
-        defaultValue={nilai.kategori ?? ""}
-      />
-      <Input
-        label="Link foto"
+        label="Link foto utama"
         name="foto_url"
         inputRef={fotoRef}
         placeholder="https://... atau /produk/nama-file.svg"
@@ -169,9 +236,28 @@ export default function FormProduk({ produk = {}, labelTombol }) {
       </div>
 
       <Input
+        label="Foto tambahan galeri (satu URL per baris)"
+        name="foto_tambahan"
+        textarea
+        rows={3}
+        placeholder="https://.../foto-2.jpg&#10;https://.../foto-3.jpg"
+        defaultValue={nilai.foto_tambahan ?? ""}
+      />
+
+      <Input
+        label="Varian produk (satu baris per varian, format: Nama: Harga)"
+        name="varian_teks"
+        textarea
+        rows={3}
+        placeholder="Ukuran S: 25000&#10;Ukuran M: 30000&#10;Ukuran L: 35000"
+        defaultValue={nilai.varian_teks ?? ""}
+      />
+
+      <Input
         label="Deskripsi"
         name="deskripsi"
         textarea
+        rows={4}
         inputRef={deskripsiRef}
         defaultValue={nilai.deskripsi ?? ""}
       />
@@ -204,7 +290,7 @@ export default function FormProduk({ produk = {}, labelTombol }) {
         </p>
       ) : null}
 
-      <div className="flex gap-3">
+      <div className="flex gap-3 pt-2">
         <Tombol
           type="submit"
           className="disabled:cursor-not-allowed disabled:opacity-60"

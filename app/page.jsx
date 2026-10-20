@@ -1,17 +1,18 @@
 import Link from "next/link";
+import BannerBeranda from "@/components/BannerBeranda";
 import FilterProduk from "@/components/FilterProduk";
 import KartuProduk from "@/components/KartuProduk";
 import Paginasi from "@/components/Paginasi";
 import TerakhirDilihat from "@/components/TerakhirDilihat";
+import { ambilPengaturanToko } from "@/lib/pengaturan";
 import { buatKlienServer } from "@/lib/supabase/server";
-import { toko } from "@/lib/toko";
 
 export const dynamic = "force-dynamic";
 
 const PRODUK_PER_HALAMAN = 12;
 
 function terapkanFilter(query, { kategoriDipilih, kataKunci }) {
-  let hasil = query;
+  let hasil = query.eq("aktif", true);
 
   if (kategoriDipilih) {
     hasil = hasil.eq("kategori", kategoriDipilih);
@@ -39,6 +40,7 @@ function terapkanUrutan(query, urutDipilih) {
   }
 
   return query
+    .order("urutan", { ascending: true })
     .order("created_at", { ascending: false })
     .order("id", { ascending: true });
 }
@@ -59,22 +61,37 @@ export default async function HalamanKatalog({ searchParams }) {
 
   let daftarProduk = [];
   let kategoriList = [];
+  let daftarBanner = [];
   let jumlahTotal = 0;
   let totalHalaman = 0;
   let halamanTidakAda = false;
   let pesanError = "";
+  let toko = { nama: "Terpal B", tagline: "Go Open Source", jamBuka: "Buka pukul 08.00" };
 
   try {
     const supabase = buatKlienServer();
     const filter = { kategoriDipilih, kataKunci };
 
-    const [hasilHitung, hasilKategori] = await Promise.all([
+    const [hasilHitung, hasilKategori, hasilBanner, dataToko] = await Promise.all([
       terapkanFilter(
         supabase.from("produk").select("id", { count: "exact", head: true }),
         filter
       ),
-      supabase.from("produk").select("kategori").not("kategori", "is", null),
+      supabase
+        .from("produk")
+        .select("kategori")
+        .eq("aktif", true)
+        .not("kategori", "is", null),
+      supabase
+        .from("banner")
+        .select("id, judul, teks, gambar_url, tautan")
+        .eq("aktif", true)
+        .order("created_at", { ascending: false }),
+      ambilPengaturanToko(),
     ]);
+
+    toko = dataToko;
+    daftarBanner = hasilBanner.data ?? [];
 
     if (hasilHitung.error) {
       throw hasilHitung.error;
@@ -105,7 +122,9 @@ export default async function HalamanKatalog({ searchParams }) {
       const sampai = dari + PRODUK_PER_HALAMAN - 1;
       const queryProduk = terapkanUrutan(
         terapkanFilter(
-          supabase.from("produk").select("id, nama, harga, deskripsi, foto_url, kategori"),
+          supabase
+            .from("produk")
+            .select("id, nama, harga, deskripsi, foto_url, kategori, stok, harga_diskon, badge, aktif, urutan"),
           filter
         ),
         urutDipilih
@@ -132,6 +151,12 @@ export default async function HalamanKatalog({ searchParams }) {
         <p className="mt-3 max-w-xl text-lg text-teks-lembut">{toko.tagline}</p>
         <p className="mt-4 text-sm text-teks-lembut">{toko.jamBuka}</p>
       </section>
+
+      {daftarBanner.length > 0 ? (
+        <section aria-label="Banner promosi" className="mb-10">
+          <BannerBeranda bannerList={daftarBanner} />
+        </section>
+      ) : null}
 
       <TerakhirDilihat />
 
