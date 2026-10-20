@@ -6,6 +6,7 @@ import Tombol from "@/components/Tombol";
 import {
   buatDeskripsiProduk,
   simpanProduk,
+  unggahFotoProduk,
 } from "@/app/admin/actions";
 
 // Dipakai untuk tambah produk (US-08) dan ubah produk (US-09).
@@ -14,8 +15,12 @@ export default function FormProduk({ produk = {}, labelTombol }) {
   const [keadaan, aksi, sedangProses] = useActionState(simpanProduk, {});
   const [pesanAI, setPesanAI] = useState(null);
   const [sedangAI, mulaiAI] = useTransition();
+  const [pesanFoto, setPesanFoto] = useState(null);
+  const [sedangUnggah, setSedangUnggah] = useState(false);
   const formRef = useRef(null);
   const deskripsiRef = useRef(null);
+  const fotoRef = useRef(null);
+  const fileRef = useRef(null);
   const nilai = keadaan?.nilai ?? produk;
 
   function buatDeskripsi() {
@@ -53,6 +58,45 @@ export default function FormProduk({ produk = {}, labelTombol }) {
     });
   }
 
+  async function unggahFoto() {
+    const file = fileRef.current?.files?.[0];
+
+    if (!file) {
+      setPesanFoto({ jenis: "error", teks: "Pilih file foto dulu." });
+      return;
+    }
+
+    setPesanFoto(null);
+    setSedangUnggah(true);
+
+    try {
+      const data = new FormData();
+      data.append("foto", file);
+      const hasil = await unggahFotoProduk(data);
+
+      if (hasil?.error) {
+        setPesanFoto({ jenis: "error", teks: hasil.error });
+        return;
+      }
+
+      if (fotoRef.current) {
+        fotoRef.current.value = hasil.url;
+      }
+
+      setPesanFoto({
+        jenis: "sukses",
+        teks: "Foto berhasil diunggah. Simpan produk untuk memakai foto ini.",
+      });
+    } catch {
+      setPesanFoto({
+        jenis: "error",
+        teks: "Foto belum bisa diunggah. Periksa koneksi lalu coba lagi.",
+      });
+    } finally {
+      setSedangUnggah(false);
+    }
+  }
+
   return (
     <form ref={formRef} action={aksi} className="flex max-w-xl flex-col gap-4">
       {produk.id ? <input type="hidden" name="id" value={produk.id} /> : null}
@@ -68,7 +112,7 @@ export default function FormProduk({ produk = {}, labelTombol }) {
         label="Harga (Rp)"
         name="harga"
         type="number"
-        min="0"
+        min="1"
         step="1"
         defaultValue={nilai.harga ?? ""}
         error={keadaan?.fieldErrors?.harga}
@@ -82,9 +126,48 @@ export default function FormProduk({ produk = {}, labelTombol }) {
       <Input
         label="Link foto"
         name="foto_url"
+        inputRef={fotoRef}
         placeholder="https://... atau /produk/nama-file.svg"
         defaultValue={nilai.foto_url ?? ""}
       />
+
+      <div className="flex flex-col gap-2 rounded-lg border border-garis bg-permukaan p-3">
+        <label className="flex flex-col gap-1.5 text-sm font-semibold">
+          Unggah foto dari perangkat
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="w-full rounded-lg border border-garis bg-latar px-3 py-2 text-sm font-normal text-teks file:mr-3 file:rounded-md file:border-0 file:bg-permukaan file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-teks"
+          />
+        </label>
+        <p className="text-xs text-teks-lembut">
+          JPG, PNG, atau WebP. Maksimal 2 MB. Foto akan disimpan di Supabase
+          Storage dan link-nya diisi otomatis.
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <Tombol
+            type="button"
+            varian="garis"
+            onClick={unggahFoto}
+            disabled={sedangUnggah || sedangAI || sedangProses}
+            className="disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {sedangUnggah ? "Mengunggah..." : "Unggah foto"}
+          </Tombol>
+          {pesanFoto ? (
+            <p
+              role={pesanFoto.jenis === "error" ? "alert" : "status"}
+              className={`text-sm ${
+                pesanFoto.jenis === "error" ? "text-bahaya" : "text-utama"
+              }`}
+            >
+              {pesanFoto.teks}
+            </p>
+          ) : null}
+        </div>
+      </div>
+
       <Input
         label="Deskripsi"
         name="deskripsi"
@@ -125,7 +208,7 @@ export default function FormProduk({ produk = {}, labelTombol }) {
         <Tombol
           type="submit"
           className="disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={sedangProses || sedangAI}
+          disabled={sedangProses || sedangAI || sedangUnggah}
         >
           {sedangProses ? "Menyimpan..." : labelTombol}
         </Tombol>

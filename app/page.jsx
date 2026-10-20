@@ -1,48 +1,88 @@
+import Link from "next/link";
 import FilterProduk from "@/components/FilterProduk";
 import KartuProduk from "@/components/KartuProduk";
+import Paginasi from "@/components/Paginasi";
+import TerakhirDilihat from "@/components/TerakhirDilihat";
 import { buatKlienServer } from "@/lib/supabase/server";
 import { toko } from "@/lib/toko";
 
 export const dynamic = "force-dynamic";
 
+const PRODUK_PER_HALAMAN = 12;
+
+function terapkanFilter(query, { kategoriDipilih, kataKunci }) {
+  let hasil = query;
+
+  if (kategoriDipilih) {
+    hasil = hasil.eq("kategori", kategoriDipilih);
+  }
+
+  if (kataKunci) {
+    const pola = kataKunci.replace(/[\\%_]/g, "\\$&");
+    hasil = hasil.ilike("nama", `%${pola}%`);
+  }
+
+  return hasil;
+}
+
+function terapkanUrutan(query, urutDipilih) {
+  if (urutDipilih === "termurah") {
+    return query
+      .order("harga", { ascending: true })
+      .order("id", { ascending: true });
+  }
+
+  if (urutDipilih === "termahal") {
+    return query
+      .order("harga", { ascending: false })
+      .order("id", { ascending: true });
+  }
+
+  return query
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: true });
+}
+
 export default async function HalamanKatalog({ searchParams }) {
-  const { q, kategori } = (await searchParams) ?? {};
+  const { q, kategori, urut, halaman: halamanParam } =
+    (await searchParams) ?? {};
   const kataKunci = (typeof q === "string" ? q : "").trim().slice(0, 100);
   const kategoriDipilih = (typeof kategori === "string" ? kategori : "").trim().slice(0, 80);
+  const urutDipilih = ["termurah", "termahal"].includes(urut)
+    ? urut
+    : "terbaru";
+  const halaman =
+    /^\d+$/.test(String(halamanParam ?? "")) && Number(halamanParam) > 0
+      ? Math.min(Number(halamanParam), 1000)
+      : 1;
   const adaFilter = Boolean(kataKunci || kategoriDipilih);
 
   let daftarProduk = [];
   let kategoriList = [];
+  let jumlahTotal = 0;
+  let totalHalaman = 0;
+  let halamanTidakAda = false;
   let pesanError = "";
 
   try {
     const supabase = buatKlienServer();
+    const filter = { kategoriDipilih, kataKunci };
 
-    let queryProduk = supabase
-      .from("produk")
-      .select("id, nama, harga, deskripsi, foto_url, kategori")
-      .order("created_at", { ascending: false })
-      .order("id", { ascending: true });
-
-    if (kategoriDipilih) {
-      queryProduk = queryProduk.eq("kategori", kategoriDipilih);
-    }
-
-    if (kataKunci) {
-      const pola = kataKunci.replace(/[\\%_]/g, "\\$&");
-      queryProduk = queryProduk.ilike("nama", `%${pola}%`);
-    }
-
-    const [hasilProduk, hasilKategori] = await Promise.all([
-      queryProduk,
+    const [hasilHitung, hasilKategori] = await Promise.all([
+      terapkanFilter(
+        supabase.from("produk").select("id", { count: "exact", head: true }),
+        filter
+      ),
       supabase.from("produk").select("kategori").not("kategori", "is", null),
     ]);
 
-    if (hasilProduk.error) {
-      throw hasilProduk.error;
+    if (hasilHitung.error) {
+      throw hasilHitung.error;
     }
 
-    daftarProduk = hasilProduk.data ?? [];
+    jumlahTotal = hasilHitung.count ?? 0;
+    totalHalaman = Math.ceil(jumlahTotal / PRODUK_PER_HALAMAN);
+    halamanTidakAda = totalHalaman > 0 && halaman > totalHalaman;
 
     if (hasilKategori.error) {
       console.error("Gagal mengambil daftar kategori:", hasilKategori.error.message);
@@ -59,6 +99,25 @@ export default async function HalamanKatalog({ searchParams }) {
     if (kategoriDipilih && !kategoriList.includes(kategoriDipilih)) {
       kategoriList.unshift(kategoriDipilih);
     }
+
+    if (!halamanTidakAda && jumlahTotal > 0) {
+      const dari = (halaman - 1) * PRODUK_PER_HALAMAN;
+      const sampai = dari + PRODUK_PER_HALAMAN - 1;
+      const queryProduk = terapkanUrutan(
+        terapkanFilter(
+          supabase.from("produk").select("id, nama, harga, deskripsi, foto_url, kategori"),
+          filter
+        ),
+        urutDipilih
+      );
+      const { data, error } = await queryProduk.range(dari, sampai);
+
+      if (error) {
+        throw error;
+      }
+
+      daftarProduk = data ?? [];
+    }
   } catch (error) {
     console.error("Gagal mengambil produk:", error.message);
     pesanError = "Katalog belum bisa dimuat. Coba muat ulang halaman ini.";
@@ -74,6 +133,8 @@ export default async function HalamanKatalog({ searchParams }) {
         <p className="mt-4 text-sm text-teks-lembut">{toko.jamBuka}</p>
       </section>
 
+      <TerakhirDilihat />
+
       <section aria-labelledby="judul-produk" className="flex flex-col gap-5">
         <h2 id="judul-produk" className="text-xl font-bold">
           Produk kami
@@ -83,6 +144,7 @@ export default async function HalamanKatalog({ searchParams }) {
           kategoriList={kategoriList}
           kataKunci={kataKunci}
           kategoriDipilih={kategoriDipilih}
+          urutDipilih={urutDipilih}
         />
 
         {pesanError ? (
@@ -92,6 +154,16 @@ export default async function HalamanKatalog({ searchParams }) {
           >
             {pesanError}
           </p>
+        ) : halamanTidakAda ? (
+          <div className="flex flex-col items-start gap-3 rounded-lg border border-garis bg-permukaan px-4 py-4 text-sm text-teks-lembut">
+            <p>Halaman ini tidak tersedia. Katalog hanya sampai halaman {totalHalaman}.</p>
+            <Link
+              href="/"
+              className="font-semibold text-utama underline underline-offset-4"
+            >
+              Kembali ke halaman pertama
+            </Link>
+          </div>
         ) : daftarProduk.length === 0 ? (
           <p className="rounded-lg border border-garis bg-permukaan px-4 py-3 text-sm text-teks-lembut">
             {adaFilter
@@ -101,13 +173,28 @@ export default async function HalamanKatalog({ searchParams }) {
         ) : (
           <>
             <p className="text-sm text-teks-lembut" aria-live="polite">
-              {daftarProduk.length} produk
+              {jumlahTotal} produk
               {adaFilter ? " cocok dengan filter." : " tersedia."}
+              {totalHalaman > 1
+                ? ` Halaman ${halaman} dari ${totalHalaman}.`
+                : ""}
             </p>
             <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
               {daftarProduk.map((produk) => (
                 <KartuProduk key={produk.id} produk={produk} />
               ))}
+            </div>
+            <div className="pt-2">
+              <Paginasi
+                basePath="/"
+                halaman={halaman}
+                totalHalaman={totalHalaman}
+                params={{
+                  q: kataKunci,
+                  kategori: kategoriDipilih,
+                  urut: urutDipilih,
+                }}
+              />
             </div>
           </>
         )}

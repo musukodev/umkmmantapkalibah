@@ -184,19 +184,314 @@ Kolom jumlah boleh dikosongkan sementara saat mengetik, lalu kembali ke 1 saat k
 
 Ditambahkan ikon Apple Touch dan `theme-color` agar pemasangan di iOS/Android lebih rapi.
 
-## US-14 Deskripsi produk dibuat AI
+## US-15 Urutkan produk
 
 **Prompt [SENDIRI]:**
 
-> Baca docs/user-stories.md bagian US-14 dan aturan keamanan AGENTS.md. Tambahkan tombol “Buat deskripsi dengan AI” di FormProduk. Panggil Gemini API dari server memakai GEMINI_API_KEY, jangan pernah mengirim kunci ke browser. Hasilnya mengisi kolom deskripsi sebelum produk disimpan. Tangani error, timeout, dan kuota. Jangan memasang paket npm baru.
+> Baca docs/user-stories.md bagian US-15. Tambahkan pilihan urutan di halaman katalog: terbaru, termurah, dan termahal. Urutan diterapkan di query database Supabase, bukan di browser. Pertahankan filter pencarian dan kategori yang sudah ada.
 
 **Hasil:**
 
-`lib/gemini.js` memanggil endpoint `generateContent` memakai `fetch` dan header `x-goog-api-key`. Server Action `buatDeskripsiProduk` memeriksa `wajibAdmin()`, memvalidasi nama, lalu mengembalikan deskripsi. Tombol di form menampilkan status proses dan mengisi textarea tanpa menghapus isian lain. Key hanya ada di server.
+Katalog menerima parameter `urut` (`terbaru`, `termurah`, `termahal`). PostgREST query menerapkan urutan langsung pada kolom `harga` atau `created_at`. Dropdown urutan terintegrasi rapi pada formulir filter katalog.
 
 **Perbaikan:**
 
-Ditambahkan batas panjang input, timeout 20 detik, pemetaan pesan untuk key kosong, kuota, model tidak ditemukan, dan permintaan yang diblokir. Deskripsi tetap bisa diisi manual kalau AI gagal.
+Ditambahkan secondary sort pada kolom `id` agar urutan konsisten saat beberapa produk memiliki harga yang sama.
+
+## US-16 Paginasi atau muat lebih banyak
+
+**Prompt [SENDIRI]:**
+
+> Baca docs/user-stories.md bagian US-16. Buat paginasi server di katalog dengan batas produk per halaman. Query database memakai range dan count exact. Buat komponen navigasi halaman yang mempertahankan kata kunci pencarian, kategori, dan pilihan urutan.
+
+**Hasil:**
+
+Katalog membatasi 12 produk per halaman dengan `.range(dari, sampai)`. Komponen `Paginasi` menampilkan tombol sebelumnya/berikutnya dan nomor halaman. Menampilkan pesan ramah jika nomor halaman di luar batas.
+
+**Perbaikan:**
+
+Query hitung total dan query kategori dijalankan bersamaan dengan `Promise.all` untuk meminimalkan latensi.
+
+## US-17 Produk terkait di halaman detail
+
+**Prompt [SENDIRI]:**
+
+> Baca docs/user-stories.md bagian US-17. Pada halaman detail produk, tampilkan hingga 3 produk lain dari kategori yang sama dari database. Produk yang sedang dibuka tidak boleh ikut tampil.
+
+**Hasil:**
+
+Halaman detail menampilkan bagian "Produk terkait" di bawah artikel utama, memuat maksimal 3 produk dari kategori yang sama dengan `neq("id", id)`.
+
+**Perbaikan:**
+
+Disediakan tautan langsung menuju halaman kategori terkait di atas daftar produk rekomendasi.
+
+## US-21 Keranjang, pesan semua via WhatsApp
+
+**Prompt [SENDIRI]:**
+
+> Baca docs/user-stories.md bagian US-21. Buat sistem keranjang belanja berbasis browser (localStorage). Pengunjung bisa menambah produk dari halaman detail, mengatur jumlah, menghapus produk, dan melihat total harga. Sediakan halaman /keranjang dan satu tombol untuk mengirim seluruh pesanan dalam satu pesan WhatsApp ke nomor toko.
+
+**Hasil:**
+
+Dibuat `KeranjangProvider` di root layout dan halaman `/keranjang`. Tombol detail produk dapat menambahkan barang ke keranjang. Halaman keranjang menyusun seluruh item secara berurutan dan menghasilkan tautan WhatsApp dengan format rincian pesanan dan total harga.
+
+**Perbaikan:**
+
+Jumlah item ditampilkan sebagai badge di bilah navigasi Header. Batas kuantitas diatur 1–99 per item.
+
+## US-22 Halaman Tentang dan kontak toko
+
+**Prompt [SENDIRI]:**
+
+> Baca docs/user-stories.md bagian US-22. Buat halaman /tentang yang menampilkan identitas toko dari lib/toko.js: profil, alamat, jam buka, dan tombol kontak WhatsApp. Tautkan halaman dari Header dan Footer.
+
+**Hasil:**
+
+Halaman `/tentang` memuat informasi toko Terpal B, alamat Politeknik Negeri Batam, jam buka, dan tombol chat WhatsApp. Tautan "Tentang" tersedia di Header dan Footer.
+
+**Perbaikan:**
+
+Layout responsif dengan kartu informasi terpisah untuk lokasi dan jadwal operasional.
+
+## US-23 Bagikan atau salin link produk
+
+**Prompt [SENDIRI]:**
+
+> Baca docs/user-stories.md bagian US-23. Tambahkan tombol "Bagikan produk" di halaman detail produk. Gunakan Web Share API jika tersedia, atau salin link ke clipboard dengan umpan balik status "Link tersalin".
+
+**Hasil:**
+
+Komponen `BagikanProduk` memanggil `navigator.share` pada perangkat pendukung atau menyalin tautan saat ini ke `navigator.clipboard`. Menampilkan pesan konfirmasi status saat tautan berhasil disalin.
+
+**Perbaikan:**
+
+Ditambahkan fallback `window.prompt` jika browser memblokir clipboard API di konteks tertentu.
+
+## US-24 Favorit tersimpan di browser
+
+**Prompt [SENDIRI]:**
+
+> Baca docs/user-stories.md bagian US-24. Buat fitur simpan produk favorit di browser menggunakan localStorage. Sediakan tombol simpan/hapus di halaman detail dan halaman khusus /favorit untuk melihat semua produk yang ditandai.
+
+**Hasil:**
+
+Dibuat hook `useFavorit`, tombol `TombolFavorit` pada halaman detail, dan halaman `/favorit`. Produk favorit disimpan ke localStorage dan bertahan setelah refresh. Bilah Header memiliki navigasi ke `/favorit`.
+
+**Perbaikan:**
+
+State sinkronisasi siap ditangani secara asinkron agar tidak terjadi perbedaan render SSR/klien.
+
+## US-25 Mode gelap
+
+**Prompt [SENDIRI]:**
+
+> Baca docs/user-stories.md bagian US-25 dan DESIGN.md. Buat fitur mode gelap dengan toggle di Header. Simpan preferensi pengguna di localStorage dan terapkan tema tanpa kedipan (flash). Pastikan kontras warna tetap nyaman dan teks terbaca jelas.
+
+**Hasil:**
+
+Token warna diatur lewat variabel CSS di `app/globals.css` dengan kelas `.dark`. Komponen `ThemeToggle` di Header beralih antara terang dan gelap. Script inline di `<head>` membaca localStorage sebelum render untuk mencegah efek flash.
+
+**Perbaikan:**
+
+Kontras teks pada tombol utama disesuaikan menggunakan token `text-latar` agar tombol tetap kontras dan terbaca di kedua mode.
+
+## US-26 Metadata SEO dan Open Graph
+
+**Prompt [SENDIRI]:**
+
+> Baca docs/user-stories.md bagian US-26. Gunakan generateMetadata pada halaman detail produk untuk menghasilkan title, description, dan Open Graph image absolut sesuai produk dari database.
+
+**Hasil:**
+
+`app/produk/[id]/page.jsx` mengekspor `generateMetadata` yang membaca nama, deskripsi, dan gambar produk dari database. `metadataBase` dikonfigurasi di root layout menggunakan `SITE_URL`. Kartu Twitter dan Open Graph terisi lengkap.
+
+**Perbaikan:**
+
+Fungsi `ambilProduk` dibungkus dengan `React.cache` sehingga metadata dan halaman utama hanya menjalankan 1 kali query database per permintaan.
+
+## US-27 sitemap.xml dan robots.txt
+
+**Prompt [SENDIRI]:**
+
+> Baca docs/user-stories.md bagian US-27. Buat rute metadata sitemap.xml dan robots.txt dinamis dari database Supabase. Sertakan halaman utama, tentang, kategori, dan semua produk.
+
+**Hasil:**
+
+`app/sitemap.js` membaca seluruh produk dan kategori unik dari Supabase dan menghasilkan sitemap XML. `app/robots.js` mengizinkan crawling publik, memblokir area `/admin`, dan menunjuk ke URL sitemap.
+
+**Perbaikan:**
+
+Konfigurasi `dynamic = "force-dynamic"` memastikan produk baru langsung muncul di sitemap.
+
+## US-28 Halaman 404 dan loading kustom
+
+**Prompt [SENDIRI]:**
+
+> Baca docs/user-stories.md bagian US-28. Buat app/loading.jsx dengan animasi skeleton yang rapi untuk halaman yang memuat data. Pastikan app/not-found.jsx memiliki tautan kembali ke beranda.
+
+**Hasil:**
+
+`app/loading.jsx` menampilkan animasi kerangka (pulse skeleton) untuk judul dan kartu katalog. `app/not-found.jsx` menangani rute tidak ditemukan dengan tombol kembali ke katalog.
+
+**Perbaikan:**
+
+Aria label dan role status disematkan pada komponen loading agar aksesibel bagi pembaca layar.
+
+## US-29 Upload foto ke Supabase Storage
+
+**Prompt [SENDIRI]:**
+
+> Baca docs/user-stories.md bagian US-29 dan aturan keamanan. Tambahkan fitur upload foto produk langsung ke Supabase Storage di FormProduk admin. Upload dilakukan di server memakai kunci server, dengan validasi format gambar (JPG/PNG/WebP) dan ukuran maksimal 2 MB. Masukkan URL hasil upload ke kolom link foto.
+
+**Hasil:**
+
+Server Action `unggahFotoProduk` memvalidasi tipe MIME dan ukuran, membuat bucket `produk` publik jika belum ada, lalu mengunggah file ke Storage. URL publik otomatis mengisi kolom input foto produk. Kunci rahasia aman di server.
+
+**Perbaikan:**
+
+Nama file di-generate acak dengan timestamp dan ekstensi yang divalidasi agar tidak terjadi tabrakan nama file.
+
+## US-30 Dashboard ringkasan admin
+
+**Prompt [SENDIRI]:**
+
+> Baca docs/user-stories.md bagian US-30. Tampilkan ringkasan katalog di halaman /admin: total jumlah produk dan jumlah produk per kategori dari database. Pastikan halaman terlindungi login.
+
+**Hasil:**
+
+Bagian "Ringkasan" di `/admin` menampilkan kartu total produk dan kartu jumlah produk untuk setiap kategori dari tabel `produk`. Akses dilindungi oleh `wajibAdmin()`.
+
+**Perbaikan:**
+
+Kategori diurutkan berdasarkan jumlah produk terbanyak untuk mempermudah pemantauan stok kategori.
+
+## US-33 Cari dan paginasi di list admin
+
+**Prompt [SENDIRI]:**
+
+> Baca docs/user-stories.md bagian US-33. Tambahkan fitur pencarian nama produk dan paginasi di tabel admin /admin. Kata kunci dan halaman disimpan di URL query parameters.
+
+**Hasil:**
+
+Form pencarian di `/admin` memfilter nama produk via `ilike` di Supabase. Tabel membatasi 10 produk per halaman dan menyediakan navigasi `Paginasi`. Parameter `q` dan `halaman` tersimpan di URL.
+
+**Perbaikan:**
+
+Karakter wildcard di-escape agar pencarian aman, dan tombol "Hapus pencarian" tampil saat ada filter aktif.
+
+## US-34 Validasi form admin di server
+
+**Prompt [SENDIRI]:**
+
+> Baca docs/user-stories.md bagian US-34. Perketat validasi simpan produk di server: nama wajib diisi dan harga harus angka positif lebih dari 0. Tampilkan pesan kesalahan di bawah field terkait dan pertahankan isian yang sudah diketik.
+
+**Hasil:**
+
+Server Action `simpanProduk` memvalidasi `harga <= 0` ditolak dengan pesan "Harga harus angka bulat lebih dari 0". Input HTML menggunakan `min="1"`. Nilai form dikembalikan ke form melalui `useActionState`.
+
+**Perbaikan:**
+
+Validasi mendeteksi tipe integer secara ketat dan mencegah angka floating point atau bilangan nol.
+
+## US-35 Ekspor produk ke CSV
+
+**Prompt [SENDIRI]:**
+
+> Baca docs/user-stories.md bagian US-35. Buat route handler /admin/produk/export untuk mengunduh seluruh produk dalam format CSV. Escape tanda kutip dan koma dengan benar, beri UTF-8 BOM, dan lindungi endpoint agar hanya bisa diakses admin yang login.
+
+**Hasil:**
+
+Route handler GET di `/admin/produk/export` memverifikasi sesi admin lewat `wajibAdmin()`. Menghasilkan file CSV ber-BOM `\uFEFF` dengan header lengkap dan escaping kutip ganda. Link ekspor tersedia di halaman `/admin`.
+
+**Perbaikan:**
+
+Header respons menyertakan `Content-Disposition: attachment` dengan nama file dinamis menyertakan tanggal hari ini.
+
+## US-36 Terakhir dilihat
+
+**Prompt [SENDIRI]:**
+
+> Baca docs/user-stories.md bagian US-36. Simpan riwayat produk yang dibuka pengunjung di browser (localStorage) hingga maksimal 6 produk. Tampilkan bagian "Terakhir dilihat" di beranda jika riwayat tersedia.
+
+**Hasil:**
+
+Komponen `CatatTerakhirDilihat` mencatat produk saat halaman detail dibuka. Komponen `TerakhirDilihat` di beranda membaca riwayat dan menampilkan grid kartu produk. Jika kosong, bagian tersebut tidak tampil.
+
+**Perbaikan:**
+
+Penyimpanan menghapus duplikat id produk lama dan menaruh produk terbaru di posisi awal.
+
+## US-37 Bandingkan 2 produk
+
+**Prompt [SENDIRI]:**
+
+> Baca docs/user-stories.md bagian US-37. Buat halaman /bandingkan di mana pengunjung bisa memilih dua produk dari dropdown dan membandingkannya berdampingan (foto, kategori, harga, deskripsi). Tangani kondisi jika memilih produk yang sama atau tidak valid.
+
+**Hasil:**
+
+Halaman `/bandingkan` menyediakan form pemilihan dua produk. Hasil perbandingan menampilkan kartu produk berdampingan lengkap dengan harga dan deskripsi. Tautan "Bandingkan" tersedia di Header dan halaman detail produk.
+
+**Perbaikan:**
+
+Validasi menolak jika produk pertama dan kedua sama dengan pesan "Pilih dua produk yang berbeda".
+
+## US-44 Kelola akun admin
+
+**Prompt [SENDIRI]:**
+
+> Baca docs/user-stories.md bagian US-44. Buat halaman /admin/akun untuk melihat daftar akun admin Supabase Auth, menambah admin baru dengan email dan password, serta menghapus admin lain (kecuali akun sendiri). Semua aksi diperiksa di server.
+
+**Hasil:**
+
+Halaman `/admin/akun` menampilkan tabel admin dari `supabase.auth.admin.listUsers`. Form `FormTambahAdmin` mendaftarkan admin baru terkonfirmasi. Tombol hapus menghapus akun target, namun akun yang sedang login diproteksi dan tidak menampilkan tombol hapus untuk dirinya sendiri.
+
+**Perbaikan:**
+
+NavAdmin memiliki tautan langsung ke "Akun admin". Konfirmasi password divalidasi minimal 8 karakter.
+
+## US-46 Impor produk dari CSV
+
+**Prompt [SENDIRI]:**
+
+> Baca docs/user-stories.md bagian US-46. Buat halaman /admin/produk/impor untuk mengunggah file CSV produk. Server memvalidasi setiap baris, melaporkan nomor baris yang salah, dan menyimpan baris valid sekaligus ke database. Lindungi aksi dengan login server.
+
+**Hasil:**
+
+Halaman `/admin/produk/impor` menerima file CSV (maksimal 2 MB). Parser server membaca header `nama,harga,kategori,deskripsi,foto_url`, memvalidasi setiap baris, melaporkan baris yang dilewati beserta nomor barisnya, dan menyimpan seluruh baris valid dengan 1 kali batch insert ke Supabase.
+
+**Perbaikan:**
+
+Parser CSV mandiri menangani nilai berkoma di dalam tanda kutip dan baris kosong dengan akurat tanpa memerlukan paket npm tambahan.
+
+## US-49 Halaman per kategori
+
+**Prompt [SENDIRI]:**
+
+> Baca docs/user-stories.md bagian US-49. Buat rute dinamis /kategori/[slug] yang menampilkan semua produk dalam kategori tersebut dari database. Tautkan nama kategori di halaman detail ke halaman kategori ini, dan tampilkan pesan jika kategori tidak ditemukan.
+
+**Hasil:**
+
+Halaman `/kategori/[slug]` memetakan slug URL ke kategori database, menampilkan daftar produk terkait, dan menyertakan metadata SEO dinamis. Nama kategori di halaman detail ditautkan langsung ke rute ini.
+
+**Perbaikan:**
+
+Helper `slugify` menormalisasi karakter aksen dan spasi menjadi slug URL yang bersih.
+
+## US-50 Asisten AI tanya jawab produk
+
+**Prompt [SENDIRI]:**
+
+> Baca docs/user-stories.md bagian US-50. Tambahkan kotak tanya jawab berbasis Gemini AI di halaman detail produk. LLM dipanggil dari server tanpa mengirim kunci ke browser. Jawaban hanya boleh berdasarkan data produk (nama, harga, kategori, deskripsi). Batasi panjang pertanyaan dan pasang pembatasan kiriman dasar.
+
+**Hasil:**
+
+Komponen `TanyaProduk` pada detail produk mengirim pertanyaan ke Server Action `tanyaProduk`. Prompt menginstruksikan Gemini untuk menjawab secara ketat hanya dari data produk database dan menolak halusinasi informasi yang tidak tercatat.
+
+**Perbaikan:**
+
+Dipasang honeypot anti-bot dan pembatas laju (rate limiting) berbasis IP (maksimal 5 pertanyaan per 10 menit) di sisi server.
+
 
 ## Debugging dan fitur bonus
 

@@ -2,7 +2,7 @@ import { formatRupiah } from "@/lib/format";
 import Tombol from "@/components/Tombol";
 import TombolHapus from "@/components/TombolHapus";
 
-export default function TabelProduk({ daftarProduk }) {
+export default function TabelProduk({ daftarProduk, adaPencarian = false }) {
   return (
     <div className="overflow-x-auto rounded-2xl border border-garis">
       <table className="w-full min-w-[560px] text-left text-sm">
@@ -20,7 +20,9 @@ export default function TabelProduk({ daftarProduk }) {
           {daftarProduk.length === 0 ? (
             <tr className="border-t border-garis">
               <td colSpan={4} className="px-4 py-8 text-center text-teks-lembut">
-                Belum ada produk.
+                {adaPencarian
+                  ? "Tidak ada produk yang cocok dengan pencarian."
+                  : "Belum ada produk."}
               </td>
             </tr>
           ) : (

@@ -10,6 +10,9 @@ export default function NavAdmin() {
       <Link href="/admin/password" className="font-semibold hover:text-utama">
         Ganti password
       </Link>
+      <Link href="/admin/akun" className="font-semibold hover:text-utama">
+        Akun admin
+      </Link>
       <form action={keluar} className="ml-auto">
         <button type="submit" className="text-teks-lembut hover:text-bahaya">
           Keluar

@@ -3,8 +3,17 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { buatKlienSesi } from "@/lib/supabase/ssr";
+import { buatKlienServer } from "@/lib/supabase/server";
 import { wajibAdmin } from "@/lib/auth";
 import { buatDeskripsiDenganGemini } from "@/lib/gemini";
+
+const TIPE_FOTO = {
+  "image/jpeg": "jpg",
+  "image/jpg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
+const UKURAN_FOTO_MAKS = 2 * 1024 * 1024;
 
 function bacaNilaiProduk(formData) {
   return {
@@ -125,6 +134,69 @@ export async function buatDeskripsiProduk(formData) {
   }
 }
 
+export async function unggahFotoProduk(formData) {
+  await wajibAdmin();
+
+  const file = formData.get("foto");
+
+  if (!file || typeof file === "string" || file.size === 0) {
+    return { error: "Pilih file foto yang mau diunggah." };
+  }
+
+  if (!TIPE_FOTO[file.type]) {
+    return { error: "Format foto harus JPG, PNG, atau WebP." };
+  }
+
+  if (file.size > UKURAN_FOTO_MAKS) {
+    return { error: "Ukuran foto maksimal 2 MB." };
+  }
+
+  const supabase = buatKlienServer();
+  const ekstensi = TIPE_FOTO[file.type];
+  const namaFile = `${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2, 10)}.${ekstensi}`;
+  const isi = new Blob([await file.arrayBuffer()], { type: file.type });
+  const opsi = {
+    contentType: file.type,
+    cacheControl: "31536000",
+    upsert: false,
+  };
+
+  let hasil = await supabase.storage.from("produk").upload(namaFile, isi, opsi);
+
+  if (hasil.error && /bucket.*not found/i.test(hasil.error.message)) {
+    const { error: errorBucket } = await supabase.storage.createBucket("produk", {
+      public: true,
+      fileSizeLimit: UKURAN_FOTO_MAKS,
+      allowedMimeTypes: Object.keys(TIPE_FOTO),
+    });
+
+    if (
+      !errorBucket ||
+      /already exists|duplicate/i.test(errorBucket.message)
+    ) {
+      hasil = await supabase.storage.from("produk").upload(namaFile, isi, opsi);
+    }
+  }
+
+  if (hasil.error) {
+    console.error("Gagal mengunggah foto produk:", hasil.error.message);
+    return {
+      error:
+        "Foto belum bisa diunggah. Pastikan penyimpanan Supabase sudah aktif, lalu coba lagi.",
+    };
+  }
+
+  const { data } = supabase.storage.from("produk").getPublicUrl(namaFile);
+
+  if (!data?.publicUrl) {
+    return { error: "Foto terunggah, tetapi link publiknya belum tersedia." };
+  }
+
+  return { url: data.publicUrl };
+}
+
 export async function simpanProduk(_keadaan, formData) {
   const { supabase } = await wajibAdmin();
   const nilai = bacaNilaiProduk(formData);
@@ -139,8 +211,8 @@ export async function simpanProduk(_keadaan, formData) {
   } else {
     const harga = Number(nilai.harga);
 
-    if (!Number.isInteger(harga) || harga < 0) {
-      fieldErrors.harga = "Harga harus angka bulat 0 atau lebih.";
+    if (!Number.isInteger(harga) || harga <= 0) {
+      fieldErrors.harga = "Harga harus angka bulat lebih dari 0.";
     }
   }
 

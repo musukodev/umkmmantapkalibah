@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useKeranjang } from "@/components/KeranjangProvider";
 import { formatRupiah } from "@/lib/format";
 import { toko } from "@/lib/toko";
 
@@ -8,6 +9,8 @@ const JUMLAH_MAKS = 99;
 
 export default function TombolWhatsApp({ produk }) {
   const [jumlah, setJumlah] = useState(1);
+  const [pesanKeranjang, setPesanKeranjang] = useState("");
+  const { tambah } = useKeranjang();
   const jumlahAman =
     typeof jumlah === "number" && jumlah >= 1 ? Math.min(jumlah, JUMLAH_MAKS) : 1;
   const total = produk.harga * jumlahAman;
@@ -15,6 +18,13 @@ export default function TombolWhatsApp({ produk }) {
   const totalTeks = formatRupiah(total).replace(/\u00a0/g, " ");
   const pesan = `Halo, saya mau pesan ${produk.nama} sebanyak ${jumlahAman} (${hargaSatuan} per item, total ${totalTeks})`;
   const tautan = `https://wa.me/${toko.nomorWhatsApp}?text=${encodeURIComponent(pesan)}`;
+
+  function tambahKeKeranjang() {
+    tambah(produk, jumlahAman);
+    setPesanKeranjang(
+      `${jumlahAman} ${produk.nama} ditambahkan ke keranjang.`
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4 rounded-2xl border border-garis bg-permukaan p-4 sm:flex-row sm:items-end sm:justify-between">
@@ -77,14 +87,28 @@ export default function TombolWhatsApp({ produk }) {
         <p className="text-sm text-teks-lembut">
           Total <span className="text-base font-bold text-harga">{totalTeks}</span>
         </p>
-        <a
-          href={tautan}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex w-full items-center justify-center rounded-lg bg-utama px-5 py-3 font-semibold text-white hover:bg-utama-gelap sm:w-auto"
-        >
-          Pesan via WhatsApp
-        </a>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <button
+            type="button"
+            onClick={tambahKeKeranjang}
+            className="inline-flex w-full items-center justify-center rounded-lg border border-garis bg-latar px-4 py-3 font-semibold text-teks transition-colors hover:border-utama hover:text-utama sm:w-auto"
+          >
+            Tambah ke keranjang
+          </button>
+          <a
+            href={tautan}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex w-full items-center justify-center rounded-lg bg-utama px-5 py-3 font-semibold text-latar hover:bg-utama-gelap sm:w-auto"
+          >
+            Pesan via WhatsApp
+          </a>
+        </div>
+        {pesanKeranjang ? (
+          <p role="status" aria-live="polite" className="text-sm text-utama">
+            {pesanKeranjang}
+          </p>
+        ) : null}
       </div>
     </div>
   );
