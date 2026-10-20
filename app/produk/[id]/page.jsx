@@ -1,15 +1,52 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import TombolWhatsApp from "@/components/TombolWhatsApp";
-import CatatanBelumAktif from "@/components/CatatanBelumAktif";
-import { cariProdukContoh } from "@/lib/data-contoh";
+import { buatKlienServer } from "@/lib/supabase/server";
 import { formatRupiah } from "@/lib/format";
 
-// US-02: halaman ini masih memakai data contoh.
-// Tugas peserta: ambil satu produk dari Supabase berdasarkan id, di sisi server.
+export const dynamic = "force-dynamic";
+
 export default async function HalamanDetailProduk({ params }) {
   const { id } = await params;
-  const produk = cariProdukContoh(id);
+
+  if (!/^\d+$/.test(id)) {
+    notFound();
+  }
+
+  let produk = null;
+  let pesanError = "";
+
+  try {
+    const supabase = buatKlienServer();
+    const { data, error } = await supabase
+      .from("produk")
+      .select("id, nama, harga, deskripsi, foto_url, kategori")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+
+    produk = data;
+  } catch (error) {
+    console.error("Gagal mengambil detail produk:", error.message);
+    pesanError = "Detail produk belum bisa dimuat. Coba muat ulang halaman ini.";
+  }
+
+  if (pesanError) {
+    return (
+      <div className="flex flex-col items-start gap-4 py-16">
+        <h1 className="text-2xl font-extrabold">Produk belum bisa dibuka</h1>
+        <p role="alert" className="text-teks-lembut">
+          {pesanError}
+        </p>
+        <Link href="/" className="text-sm text-teks-lembut underline underline-offset-4 hover:text-utama">
+          Kembali ke katalog
+        </Link>
+      </div>
+    );
+  }
 
   if (!produk) {
     notFound();
@@ -33,7 +70,6 @@ export default async function HalamanDetailProduk({ params }) {
         </p>
         <p className="max-w-prose leading-relaxed text-teks-lembut">{produk.deskripsi}</p>
         <TombolWhatsApp produk={produk} />
-        <CatatanBelumAktif>Tombol pesan belum berfungsi: lihat US-03.</CatatanBelumAktif>
       </div>
     </article>
   );
