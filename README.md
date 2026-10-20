@@ -77,4 +77,4 @@ Urutan yang disarankan: US-01, US-02, US-03, US-04, US-05, US-06, lalu fitur bon
 - **Nama usaha:** Terpal B
 - **Pembuat:** musukodev
 - **Link aplikasi:** https://umkmmantapkalibah.vercel.app
-- **Fitur bonus yang dikerjakan:** Belum ada (fokus US-01 sampai US-06)
+- **Fitur bonus yang dikerjakan:** US-07 (list produk admin), US-08 (tambah produk), US-09 (ubah produk), US-10 (hapus produk)

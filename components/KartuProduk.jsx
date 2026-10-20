@@ -2,13 +2,15 @@ import Link from "next/link";
 import { formatRupiah } from "@/lib/format";
 
 export default function KartuProduk({ produk }) {
+  const foto = produk.foto_url || "/produk/tanpa-foto.svg";
+
   return (
     <Link
       href={`/produk/${produk.id}`}
       className="group flex flex-col overflow-hidden rounded-2xl border border-garis bg-latar"
     >
       <img
-        src={produk.foto_url}
+        src={foto}
         alt={produk.nama}
         className="aspect-square w-full bg-permukaan object-cover"
       />

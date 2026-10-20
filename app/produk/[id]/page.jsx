@@ -52,10 +52,12 @@ export default async function HalamanDetailProduk({ params }) {
     notFound();
   }
 
+  const foto = produk.foto_url || "/produk/tanpa-foto.svg";
+
   return (
     <article className="grid gap-8 py-8 md:grid-cols-2 md:py-12">
       <img
-        src={produk.foto_url}
+        src={foto}
         alt={produk.nama}
         className="aspect-square w-full rounded-2xl border border-garis bg-permukaan object-cover"
       />

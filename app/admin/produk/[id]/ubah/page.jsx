@@ -1,13 +1,47 @@
 import { notFound } from "next/navigation";
 import NavAdmin from "@/components/NavAdmin";
 import FormProduk from "@/components/FormProduk";
-import CatatanBelumAktif from "@/components/CatatanBelumAktif";
-import { cariProdukContoh } from "@/lib/data-contoh";
+import { wajibAdmin } from "@/lib/auth";
 
-// US-09 (bonus di jalur offline): ubah produk.
 export default async function HalamanUbahProduk({ params }) {
   const { id } = await params;
-  const produk = cariProdukContoh(id);
+  const { supabase } = await wajibAdmin();
+
+  if (!/^\d+$/.test(id)) {
+    notFound();
+  }
+
+  let produk = null;
+  let pesanError = "";
+
+  try {
+    const { data, error } = await supabase
+      .from("produk")
+      .select("id, nama, harga, deskripsi, foto_url, kategori")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+
+    produk = data;
+  } catch (error) {
+    console.error("Gagal mengambil produk untuk diubah:", error.message);
+    pesanError = "Data produk belum bisa dimuat. Coba muat ulang halaman ini.";
+  }
+
+  if (pesanError) {
+    return (
+      <div className="flex flex-col gap-6 py-8">
+        <NavAdmin />
+        <h1 className="text-2xl font-extrabold">Ubah produk</h1>
+        <p role="alert" className="text-sm text-bahaya">
+          {pesanError}
+        </p>
+      </div>
+    );
+  }
 
   if (!produk) {
     notFound();
@@ -17,7 +51,6 @@ export default async function HalamanUbahProduk({ params }) {
     <div className="flex flex-col gap-6 py-8">
       <NavAdmin />
       <h1 className="text-2xl font-extrabold">Ubah produk</h1>
-      <CatatanBelumAktif>Simpan perubahan belum berfungsi: lihat US-09.</CatatanBelumAktif>
       <FormProduk produk={produk} labelTombol="Simpan perubahan" />
     </div>
   );

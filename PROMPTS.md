@@ -86,8 +86,62 @@ Pemeriksaan sesi memakai helper `wajibAdmin()` supaya aksi tetap ditolak di serv
 
 Cookie sesi yang diperbarui saat pengecekan ikut disalin ke respons redirect agar sesi tidak hilang. Pengujian lokal: `/admin`, `/admin/password`, `/admin/produk/baru`, dan `/admin/produk/1/ubah` semuanya 307 ke `/admin/login` tanpa sesi.
 
+## US-07 List produk admin
+
+**Prompt [SENDIRI]:**
+
+> Baca docs/user-stories.md bagian US-07 dan AGENTS.md. Ubah app/admin/page.jsx supaya daftar produk diambil dari tabel "produk" memakai koneksi sesi admin, bukan lib/data-contoh.js. Tampilkan pesan error yang jelas dan tulisan "Belum ada produk" kalau tabel kosong. Jangan ubah tampilan tabel.
+
+**Hasil:**
+
+`/admin` membaca 60 produk dari database lewat koneksi sesi admin (RLS tetap berlaku). Tabel menampilkan pesan kosong dan pesan error bila query gagal.
+
+**Perbaikan:**
+
+Tidak ada.
+
+## US-08 Tambah produk
+
+**Prompt [SENDIRI]:**
+
+> Baca docs/user-stories.md bagian US-08 dan AGENTS.md aturan keamanan. Buat Server Action simpanProduk di app/admin/actions.js untuk menambah produk ke database, dengan validasi nama dan harga di server. Setelah menyimpan, kembali ke /admin. Aksi wajib memeriksa login di server. Sambungkan ke components/FormProduk.jsx tanpa mengubah tampilan.
+
+**Hasil:**
+
+Form `/admin/produk/baru` menyimpan produk ke tabel `produk`, menampilkan error per field, lalu mengarahkan ke `/admin?pesan=disimpan`. Aksi memakai `wajibAdmin()` sehingga ditolak tanpa sesi.
+
+**Perbaikan:**
+
+`components/Input.jsx` diberi dukungan pesan error per field. Nilai yang sudah diketik dikembalikan lewat state `useActionState` supaya tidak hilang saat validasi gagal.
+
+## US-09 Ubah produk
+
+**Prompt [SENDIRI]:**
+
+> Baca docs/user-stories.md bagian US-09. Ubah app/admin/produk/[id]/ubah/page.jsx supaya mengambil produk dari database memakai koneksi sesi admin, memanggil notFound() kalau tidak ada, dan mengisi FormProduk dengan data lama. Simpan perubahan lewat Server Action simpanProduk yang memeriksa login. Hapus CatatanBelumAktif.
+
+**Hasil:**
+
+Form ubah terisi data lama dan menyimpan perubahan ke database, lalu kembali ke `/admin?pesan=disimpan`. Produk yang tidak ada memakai halaman “tidak ditemukan”.
+
+**Perbaikan:**
+
+Aksi memakai `update(...).select("id").maybeSingle()` supaya produk yang sudah dihapus tidak dilaporkan berhasil.
+
+## US-10 Hapus produk
+
+**Prompt [SENDIRI]:**
+
+> Baca docs/user-stories.md bagian US-10. Tambahkan tombol Hapus di components/TabelProduk.jsx dengan konfirmasi sebelum menghapus. Buat Server Action hapusProduk di app/admin/actions.js yang memeriksa login di server, lalu kembali ke /admin dengan pesan hasil.
+
+**Hasil:**
+
+Tombol Hapus memakai `window.confirm`, mengirim id produk lewat form ke Server Action, dan produk terhapus dari database. Setelah dihapus muncul pesan “Produk berhasil dihapus” di `/admin`.
+
+**Perbaikan:**
+
+Ditambahkan gambar cadangan `public/produk/tanpa-foto.svg` untuk produk yang tidak punya `foto_url`, dipakai di katalog, tabel admin, dan halaman detail.
+
 ## Debugging dan fitur bonus
 
-Belum ada fitur bonus yang dikerjakan. Fokus penyelesaian: US-01 sampai US-06 dan pemeriksaan Langkah 15.
-
-Catatan pengujian: login, ganti password, validasi password pendek/konfirmasi berbeda, dan logout diuji memakai akun uji sementara di Supabase Auth. Akun uji dihapus kembali setelah pengujian; akun admin asli tidak diubah.
+Pengujian US-07 sampai US-10 memakai akun uji sementara di Supabase Auth: menambah produk, mengubahnya, menghapusnya, dan memastikan aksi tanpa login ditolak. Produk dan akun uji sudah dihapus kembali; akun admin asli tidak diubah.
