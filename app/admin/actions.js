@@ -2,11 +2,13 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { buatKlienSesi } from "@/lib/supabase/ssr";
-import { buatKlienServer } from "@/lib/supabase/server";
 import { wajibAdmin } from "@/lib/auth";
 import { buatDeskripsiDenganGemini } from "@/lib/gemini";
 import { catatLogAdmin } from "@/lib/log";
+import { bolehLakukanAksi } from "@/lib/rate-limit";
+
 
 const TIPE_FOTO = {
   "image/jpeg": "jpg",
@@ -35,6 +37,17 @@ function bacaNilaiProduk(formData) {
 }
 
 export async function masuk(_keadaan, formData) {
+  const kepala = await headers();
+  try {
+    if (!(await bolehLakukanAksi(kepala, "login", 5, 300))) {
+      return {
+        error: "Terlalu banyak percobaan masuk. Coba lagi dalam beberapa menit.",
+      };
+    }
+  } catch {
+    return { error: "Login sementara tidak tersedia. Coba lagi beberapa saat lagi." };
+  }
+
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
 
@@ -43,7 +56,7 @@ export async function masuk(_keadaan, formData) {
   }
 
   const supabase = await buatKlienSesi();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
     if (error.code === "email_not_confirmed") {
@@ -55,6 +68,11 @@ export async function masuk(_keadaan, formData) {
     }
 
     return { error: "Login belum bisa diproses. Coba lagi beberapa saat lagi." };
+  }
+
+  if (data.user?.app_metadata?.role !== "admin") {
+    await supabase.auth.signOut();
+    return { error: "Akun ini tidak memiliki akses admin." };
   }
 
   redirect("/admin");
@@ -144,7 +162,7 @@ export async function buatDeskripsiProduk(formData) {
 }
 
 export async function unggahFotoProduk(formData) {
-  await wajibAdmin();
+  const { supabase } = await wajibAdmin();
 
   const file = formData.get("foto");
 
@@ -160,7 +178,6 @@ export async function unggahFotoProduk(formData) {
     return { error: "Ukuran foto maksimal 2 MB." };
   }
 
-  const supabase = buatKlienServer();
   const ekstensi = TIPE_FOTO[file.type];
   const namaFile = `${Date.now()}-${Math.random()
     .toString(36)
@@ -172,28 +189,13 @@ export async function unggahFotoProduk(formData) {
     upsert: false,
   };
 
-  let hasil = await supabase.storage.from("produk").upload(namaFile, isi, opsi);
-
-  if (hasil.error && /bucket.*not found/i.test(hasil.error.message)) {
-    const { error: errorBucket } = await supabase.storage.createBucket("produk", {
-      public: true,
-      fileSizeLimit: UKURAN_FOTO_MAKS,
-      allowedMimeTypes: Object.keys(TIPE_FOTO),
-    });
-
-    if (
-      !errorBucket ||
-      /already exists|duplicate/i.test(errorBucket.message)
-    ) {
-      hasil = await supabase.storage.from("produk").upload(namaFile, isi, opsi);
-    }
-  }
+  const hasil = await supabase.storage.from("produk").upload(namaFile, isi, opsi);
 
   if (hasil.error) {
     console.error("Gagal mengunggah foto produk:", hasil.error.message);
     return {
       error:
-        "Foto belum bisa diunggah. Pastikan penyimpanan Supabase sudah aktif, lalu coba lagi.",
+        "Foto belum bisa diunggah. Pastikan skema tambahan dan izin Storage sudah diterapkan, lalu coba lagi.",
     };
   }
 
@@ -213,6 +215,8 @@ export async function simpanProduk(_keadaan, formData) {
 
   if (!nilai.nama) {
     fieldErrors.nama = "Nama produk wajib diisi.";
+  } else if (nilai.nama.length > 200) {
+    fieldErrors.nama = "Nama produk maksimal 200 karakter.";
   }
 
   if (!nilai.harga) {
@@ -220,21 +224,21 @@ export async function simpanProduk(_keadaan, formData) {
   } else {
     const harga = Number(nilai.harga);
 
-    if (!Number.isInteger(harga) || harga <= 0) {
+    if (!Number.isSafeInteger(harga) || harga <= 0 || harga > 2147483647) {
       fieldErrors.harga = "Harga harus angka bulat lebih dari 0.";
     }
   }
 
   if (nilai.harga_diskon) {
     const diskon = Number(nilai.harga_diskon);
-    if (!Number.isInteger(diskon) || diskon <= 0) {
-      fieldErrors.harga_diskon = "Harga diskon harus angka bulat positif.";
+    if (!Number.isSafeInteger(diskon) || diskon <= 0 || diskon >= Number(nilai.harga) || diskon > 2147483647) {
+      fieldErrors.harga_diskon = "Harga diskon harus angka positif dan lebih kecil dari harga normal.";
     }
   }
 
   if (nilai.stok) {
     const stok = Number(nilai.stok);
-    if (!Number.isInteger(stok) || stok < 0) {
+    if (!Number.isSafeInteger(stok) || stok < 0 || stok > 2147483647) {
       fieldErrors.stok = "Stok harus angka bulat 0 atau lebih.";
     }
   }
@@ -243,6 +247,42 @@ export async function simpanProduk(_keadaan, formData) {
     return {
       error: "Periksa kembali isian yang ditandai.",
       fieldErrors,
+      nilai,
+    };
+  }
+
+  const barisFoto = (nilai.foto_tambahan || "")
+    .split("\n")
+    .map((f) => f.trim())
+    .filter(Boolean);
+  const barisVarian = (nilai.varian_teks || "")
+    .split("\n")
+    .map((v) => v.trim())
+    .filter(Boolean);
+  const recordsVarian = [];
+  const varianError = [];
+
+  barisVarian.forEach((baris, idx) => {
+    const pemisah = baris.indexOf(":");
+    const nama = pemisah >= 0 ? baris.slice(0, pemisah).trim() : "";
+    const hargaTeks = pemisah >= 0 ? baris.slice(pemisah + 1).trim() : "";
+    const harga = Number(hargaTeks);
+
+    if (!nama || !/^\d+$/.test(hargaTeks) || !Number.isSafeInteger(harga) || harga <= 0 || harga > 2147483647) {
+      varianError.push(`Baris ${idx + 1} harus berformat Nama: harga positif.`);
+      return;
+    }
+
+    recordsVarian.push({
+      nama: nama.slice(0, 100),
+      harga,
+      urutan: idx,
+    });
+  });
+
+  if (varianError.length > 0) {
+    return {
+      error: `Periksa varian produk. ${varianError.join(" ")}`,
       nilai,
     };
   }
@@ -314,57 +354,40 @@ export async function simpanProduk(_keadaan, formData) {
     );
   }
 
-  // Sinkronisasi foto_produk tambahan
-  try {
-    await supabase.from("foto_produk").delete().eq("produk_id", idProduk);
-    const barisFoto = (nilai.foto_tambahan || "")
-      .split("\n")
-      .map((f) => f.trim())
-      .filter(Boolean);
+  const recordsFoto = barisFoto.map((url, idx) => ({
+    produk_id: Number(idProduk),
+    url: url.slice(0, 1000),
+    urutan: idx,
+  }));
+  const recordsVarianProduk = recordsVarian.map((varian) => ({
+    ...varian,
+    produk_id: Number(idProduk),
+  }));
 
-    if (barisFoto.length > 0) {
-      const recordsFoto = barisFoto.map((url, idx) => ({
-        produk_id: Number(idProduk),
-        url,
-        urutan: idx,
-      }));
-      await supabase.from("foto_produk").insert(recordsFoto);
-    }
-  } catch (errFoto) {
-    console.error("Gagal memperbarui foto_produk:", errFoto.message);
-  }
+  const { error: errorHapusFoto } = await supabase
+    .from("foto_produk")
+    .delete()
+    .eq("produk_id", idProduk);
+  const { error: errorFoto } = recordsFoto.length
+    ? await supabase.from("foto_produk").insert(recordsFoto)
+    : { error: null };
+  const { error: errorHapusVarian } = await supabase
+    .from("varian_produk")
+    .delete()
+    .eq("produk_id", idProduk);
+  const { error: errorVarian } = recordsVarianProduk.length
+    ? await supabase.from("varian_produk").insert(recordsVarianProduk)
+    : { error: null };
 
-  // Sinkronisasi varian_produk
-  try {
-    await supabase.from("varian_produk").delete().eq("produk_id", idProduk);
-    const barisVarian = (nilai.varian_teks || "")
-      .split("\n")
-      .map((v) => v.trim())
-      .filter(Boolean);
-
-    if (barisVarian.length > 0) {
-      const recordsVarian = [];
-      barisVarian.forEach((b, idx) => {
-        const pisah = b.split(/[:=]/);
-        if (pisah.length >= 2) {
-          const namaVarian = pisah[0].trim();
-          const hargaVarian = Number(pisah[1].replace(/[^\d]/g, ""));
-          if (namaVarian && !isNaN(hargaVarian) && hargaVarian > 0) {
-            recordsVarian.push({
-              produk_id: Number(idProduk),
-              nama: namaVarian,
-              harga: hargaVarian,
-              urutan: idx,
-            });
-          }
-        }
-      });
-      if (recordsVarian.length > 0) {
-        await supabase.from("varian_produk").insert(recordsVarian);
-      }
-    }
-  } catch (errVarian) {
-    console.error("Gagal memperbarui varian_produk:", errVarian.message);
+  if (errorHapusFoto || errorFoto || errorHapusVarian || errorVarian) {
+    console.error("Gagal memperbarui galeri atau varian produk:", {
+      foto: errorHapusFoto?.message || errorFoto?.message,
+      varian: errorHapusVarian?.message || errorVarian?.message,
+    });
+    return {
+      error: "Produk tersimpan, tetapi foto tambahan atau varian belum diperbarui. Pastikan skema tambahan sudah dijalankan.",
+      nilai: { ...nilai, id: String(idProduk) },
+    };
   }
 
   revalidatePath("/");

@@ -27,7 +27,8 @@ export default function TombolWhatsApp({
       ? Number(varianDipilih.harga)
       : produk.harga_diskon !== undefined &&
         produk.harga_diskon !== null &&
-        Number(produk.harga_diskon) > 0
+        Number(produk.harga_diskon) > 0 &&
+        Number(produk.harga_diskon) < Number(produk.harga)
       ? Number(produk.harga_diskon)
       : Number(produk.harga);
 
@@ -64,6 +65,9 @@ export default function TombolWhatsApp({
         ...produk,
         nama: namaLengkap,
         harga: hargaPerItem,
+        keranjangId: varianDipilih
+          ? `${produk.id}:varian:${varianDipilih.id}`
+          : String(produk.id),
       },
       jumlahAman
     );

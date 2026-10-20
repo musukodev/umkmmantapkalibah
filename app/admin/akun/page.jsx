@@ -31,18 +31,22 @@ export default async function HalamanAkunAdmin({ searchParams }) {
 
   try {
     const admin = buatKlienServer();
-    const { data, error } = await admin.auth.admin.listUsers({
-      page: 1,
-      perPage: 100,
-    });
+    const semuaPengguna = [];
+    for (let page = 1; ; page += 1) {
+      const { data, error } = await admin.auth.admin.listUsers({
+        page,
+        perPage: 100,
+      });
 
-    if (error) {
-      throw error;
+      if (error) throw error;
+      const batch = data?.users ?? [];
+      semuaPengguna.push(...batch);
+      if (batch.length < 100) break;
     }
 
-    daftarAdmin = [...(data?.users ?? [])].sort((a, b) =>
-      String(a.created_at).localeCompare(String(b.created_at))
-    );
+    daftarAdmin = semuaPengguna
+      .filter((pengguna) => pengguna.app_metadata?.role === "admin")
+      .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
   } catch (error) {
     console.error("Gagal mengambil daftar admin:", error.message);
     pesanError = "Daftar admin belum bisa dimuat. Coba muat ulang halaman ini.";

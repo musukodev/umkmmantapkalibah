@@ -3,8 +3,9 @@ import FormBanner from "@/components/FormBanner";
 import { wajibAdmin } from "@/lib/auth";
 import { hapusBanner, toggleAktifBanner } from "@/app/admin/banner/actions";
 
-export default async function HalamanAdminBanner() {
+export default async function HalamanAdminBanner({ searchParams }) {
   const { supabase } = await wajibAdmin();
+  const { pesan } = (await searchParams) ?? {};
 
   let daftarBanner = [];
   try {
@@ -26,6 +27,12 @@ export default async function HalamanAdminBanner() {
           {daftarBanner.length} banner terdaftar
         </p>
       </div>
+
+      {pesan === "gagal" ? (
+        <p role="alert" className="text-sm text-bahaya">
+          Status banner belum bisa diperbarui. Coba lagi.
+        </p>
+      ) : null}
 
       <FormBanner />
 
@@ -54,6 +61,14 @@ export default async function HalamanAdminBanner() {
                     {b.teks ? (
                       <p className="text-xs text-teks-lembut">{b.teks}</p>
                     ) : null}
+                    <details className="mt-2">
+                      <summary className="cursor-pointer text-xs font-semibold text-utama">
+                        Ubah banner
+                      </summary>
+                      <div className="mt-3 min-w-[280px]">
+                        <FormBanner banner={b} />
+                      </div>
+                    </details>
                   </td>
                   <td className="px-4 py-3 text-xs text-teks-lembut">
                     {b.tautan || "—"}

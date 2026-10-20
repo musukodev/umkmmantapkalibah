@@ -128,6 +128,9 @@ export default async function HalamanDetailProduk({ params }) {
       ]);
 
       daftarFoto = hasilFoto.data ?? [];
+      if (hasilVarian.error) {
+        throw hasilVarian.error;
+      }
       daftarVarian = hasilVarian.data ?? [];
       daftarUlasan = hasilUlasan.data ?? [];
     }
@@ -163,6 +166,7 @@ export default async function HalamanDetailProduk({ params }) {
         .eq("kategori", produk.kategori)
         .eq("aktif", true)
         .neq("id", produk.id)
+        .order("urutan", { ascending: true })
         .order("created_at", { ascending: false })
         .order("id", { ascending: true })
         .limit(3);
@@ -233,7 +237,9 @@ export default async function HalamanDetailProduk({ params }) {
             nomorWhatsApp={toko.nomorWhatsApp}
           />
 
-          <p className="max-w-prose leading-relaxed text-teks-lembut">{produk.deskripsi}</p>
+          <p className="max-w-prose leading-relaxed text-teks-lembut">
+            {produk.deskripsi || "Belum ada deskripsi untuk produk ini."}
+          </p>
 
           <div className="flex flex-wrap items-center gap-3 pt-2">
             <TombolFavorit produk={produk} />

@@ -62,7 +62,7 @@ export default function IsiKeranjang({ nomorWhatsApp }) {
 
           return (
             <li
-              key={item.id}
+              key={item.keranjangId}
               className="flex gap-3 rounded-2xl border border-garis bg-latar p-3"
             >
               <img
@@ -85,7 +85,7 @@ export default function IsiKeranjang({ nomorWhatsApp }) {
                   </div>
                   <button
                     type="button"
-                    onClick={() => hapus(item.id)}
+                    onClick={() => hapus(item.keranjangId)}
                     className="shrink-0 text-sm text-teks-lembut hover:text-bahaya"
                   >
                     Hapus
@@ -101,7 +101,7 @@ export default function IsiKeranjang({ nomorWhatsApp }) {
                     <button
                       type="button"
                       aria-label={`Kurangi jumlah ${item.nama}`}
-                      onClick={() => aturJumlah(item.id, item.jumlah - 1)}
+                      onClick={() => aturJumlah(item.keranjangId, item.jumlah - 1)}
                       disabled={item.jumlah <= 1}
                       className="px-3 py-1.5 text-lg font-semibold text-teks-lembut hover:text-utama disabled:cursor-not-allowed disabled:opacity-40"
                     >
@@ -113,7 +113,7 @@ export default function IsiKeranjang({ nomorWhatsApp }) {
                     <button
                       type="button"
                       aria-label={`Tambah jumlah ${item.nama}`}
-                      onClick={() => aturJumlah(item.id, item.jumlah + 1)}
+                      onClick={() => aturJumlah(item.keranjangId, item.jumlah + 1)}
                       disabled={item.jumlah >= 99}
                       className="px-3 py-1.5 text-lg font-semibold text-teks-lembut hover:text-utama disabled:cursor-not-allowed disabled:opacity-40"
                     >

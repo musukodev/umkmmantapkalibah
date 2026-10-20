@@ -1,6 +1,7 @@
 import { wajibAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
+const UKURAN_BATCH = 500;
 
 function bungkusCsv(nilai) {
   const teks = nilai === null || nilai === undefined ? "" : String(nilai);
@@ -9,12 +10,25 @@ function bungkusCsv(nilai) {
 
 export async function GET() {
   const { supabase } = await wajibAdmin();
-  const { data, error } = await supabase
-    .from("produk")
-    .select("id, nama, harga, kategori, deskripsi, foto_url, created_at")
-    .order("id", { ascending: true });
+  const data = [];
+  try {
+    for (let awal = 0; ; awal += UKURAN_BATCH) {
+      const { data: halaman, error } = await supabase
+        .from("produk")
+        .select("id, nama, harga, kategori, deskripsi, foto_url, created_at")
+        .order("id", { ascending: true })
+        .range(awal, awal + UKURAN_BATCH - 1);
 
-  if (error) {
+      if (error) {
+        throw error;
+      }
+
+      data.push(...(halaman ?? []));
+      if (!halaman || halaman.length < UKURAN_BATCH) {
+        break;
+      }
+    }
+  } catch (error) {
     console.error("Gagal mengekspor produk:", error.message);
     return new Response("Produk belum bisa diekspor. Coba lagi.", {
       status: 500,
@@ -24,7 +38,7 @@ export async function GET() {
 
   const baris = [
     ["id", "nama", "harga", "kategori", "deskripsi", "foto_url", "created_at"],
-    ...(data ?? []).map((produk) => [
+    ...data.map((produk) => [
       produk.id,
       produk.nama,
       produk.harga,

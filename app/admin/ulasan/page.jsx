@@ -7,8 +7,9 @@ const formatTanggal = new Intl.DateTimeFormat("id-ID", {
   timeStyle: "short",
 });
 
-export default async function HalamanAdminUlasan() {
+export default async function HalamanAdminUlasan({ searchParams }) {
   const { supabase } = await wajibAdmin();
+  const { pesan } = (await searchParams) ?? {};
 
   let daftarUlasan = [];
   try {
@@ -30,6 +31,17 @@ export default async function HalamanAdminUlasan() {
           {daftarUlasan.length} ulasan masuk
         </p>
       </div>
+
+      {pesan === "gagal" ? (
+        <p role="alert" className="text-sm text-bahaya">
+          Perubahan ulasan gagal. Muat ulang halaman lalu coba lagi.
+        </p>
+      ) : null}
+      {pesan === "diperbarui" || pesan === "dihapus" ? (
+        <p role="status" className="text-sm text-utama">
+          {pesan === "dihapus" ? "Ulasan berhasil dihapus." : "Status ulasan berhasil diperbarui."}
+        </p>
+      ) : null}
 
       <div className="overflow-x-auto rounded-2xl border border-garis">
         <table className="w-full min-w-[700px] text-left text-sm">

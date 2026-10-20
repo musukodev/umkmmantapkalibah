@@ -97,7 +97,7 @@ export default function FormProduk({ produk = {}, labelTombol, kategoriList = []
 
   return (
     <form ref={formRef} action={aksi} className="flex max-w-xl flex-col gap-4">
-      {produk.id ? <input type="hidden" name="id" value={produk.id} /> : null}
+      {nilai.id ? <input type="hidden" name="id" value={nilai.id} /> : null}
 
       <div className="flex items-center gap-3 rounded-lg border border-garis bg-permukaan p-3">
         <input

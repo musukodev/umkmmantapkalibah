@@ -11,11 +11,12 @@ export default async function HalamanAdminLog() {
 
   let daftarLog = [];
   try {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("log_admin")
       .select("id, email, aksi, target, created_at")
       .order("created_at", { ascending: false })
       .limit(100);
+    if (error) throw error;
     daftarLog = data ?? [];
   } catch (err) {
     console.error("Gagal mengambil log admin:", err.message);

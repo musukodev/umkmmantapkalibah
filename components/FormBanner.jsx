@@ -5,15 +5,16 @@ import Input from "@/components/Input";
 import Tombol from "@/components/Tombol";
 import { simpanBanner } from "@/app/admin/banner/actions";
 
-export default function FormBanner() {
+export default function FormBanner({ banner }) {
+  const sedangEdit = Boolean(banner);
   const [keadaan, aksi, sedangProses] = useActionState(simpanBanner, {});
   const formRef = useRef(null);
 
   useEffect(() => {
-    if (keadaan?.sukses) {
+    if (keadaan?.sukses && !sedangEdit) {
       formRef.current?.reset();
     }
-  }, [keadaan?.sukses]);
+  }, [keadaan?.sukses, sedangEdit]);
 
   return (
     <form
@@ -21,16 +22,22 @@ export default function FormBanner() {
       action={aksi}
       className="flex flex-col gap-4 rounded-2xl border border-garis bg-permukaan p-5"
     >
-      <h2 className="font-bold">Tambah banner promosi</h2>
+      {sedangEdit ? <input type="hidden" name="id" value={banner.id} /> : null}
+      <h2 className="font-bold">
+        {sedangEdit ? "Ubah banner promosi" : "Tambah banner promosi"}
+      </h2>
       <div className="flex items-center gap-3">
         <input
-          id="banner-aktif"
+          id={sedangEdit ? `banner-aktif-${banner.id}` : "banner-aktif"}
           type="checkbox"
           name="aktif"
-          defaultChecked={true}
+          defaultChecked={banner?.aktif ?? true}
           className="h-4 w-4 rounded text-utama focus:ring-utama"
         />
-        <label htmlFor="banner-aktif" className="text-sm font-semibold">
+        <label
+          htmlFor={sedangEdit ? `banner-aktif-${banner.id}` : "banner-aktif"}
+          className="text-sm font-semibold"
+        >
           Aktifkan banner di beranda
         </label>
       </div>
@@ -40,12 +47,14 @@ export default function FormBanner() {
           label="Judul promo"
           name="judul"
           placeholder="Contoh: Diskon Musim Hujan 20%"
+          defaultValue={banner?.judul ?? ""}
           required
         />
         <Input
           label="Tautan tujuan (opsional)"
           name="tautan"
           placeholder="Contoh: /kategori/terpal-kolam"
+          defaultValue={banner?.tautan ?? ""}
         />
       </div>
 
@@ -53,6 +62,7 @@ export default function FormBanner() {
         label="Link gambar (opsional)"
         name="gambar_url"
         placeholder="https://... atau /produk/..."
+        defaultValue={banner?.gambar_url ?? ""}
       />
 
       <Input
@@ -61,6 +71,7 @@ export default function FormBanner() {
         textarea
         rows={2}
         placeholder="Penjelasan singkat penawaran..."
+        defaultValue={banner?.teks ?? ""}
       />
 
       {keadaan?.error ? (
@@ -80,7 +91,7 @@ export default function FormBanner() {
         disabled={sedangProses}
         className="self-start disabled:opacity-60"
       >
-        {sedangProses ? "Menyimpan..." : "Simpan banner"}
+        {sedangProses ? "Menyimpan..." : sedangEdit ? "Simpan perubahan" : "Simpan banner"}
       </Tombol>
     </form>
   );

@@ -13,6 +13,7 @@ export default async function sitemap() {
     const { data, error } = await supabase
       .from("produk")
       .select("id, kategori, created_at")
+      .eq("aktif", true)
       .order("created_at", { ascending: false })
       .order("id", { ascending: true });
 

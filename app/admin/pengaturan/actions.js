@@ -18,7 +18,7 @@ export async function simpanPengaturanToko(_keadaan, formData) {
     return { error: "Nama toko wajib diisi." };
   }
 
-  if (!nomorWa || nomorWa.length < 10 || nomorWa.length > 16) {
+  if (!/^62\d{8,14}$/.test(nomorWa)) {
     return {
       error:
         "Nomor WhatsApp harus angka format 62xxx dengan panjang 10–16 digit.",

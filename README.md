@@ -9,9 +9,10 @@ Template workshop vibe coding Creative Hub App Talent (CHAT) 2026. Repo ini beri
 1. **Salin repo ke akun GitHub-mu.** Klik tombol **Deploy with Vercel** di atas. Vercel akan membuat repo baru di akun GitHub-mu dan langsung men-deploy-nya. Setelah selesai, buka link Vercel-mu: katalog tampil dengan data contoh.
 2. **Buat proyek Supabase.** Masuk ke [supabase.com](https://supabase.com) dengan akun GitHub, lalu buat proyek baru. Simpan password database di tempat aman.
 3. **Siapkan database.** Di Supabase, buka **SQL Editor**, tempel seluruh isi `docs/schema.sql`, lalu klik **Run**. Tabel `produk` beserta data awal akan terbentuk.
-4. **Siapkan akun admin.** Ikuti panduan akun admin yang dibagikan mentor. Setelah itu matikan pendaftaran akun baru di **Authentication > Sign In / Providers**.
-5. **Isi environment variable di Vercel.** Buka proyekmu di Vercel > **Settings > Environment Variables**, lalu isi variabel dari `.env.example`: tiga variabel Supabase, ditambah `GEMINI_API_KEY` kalau memakai fitur deskripsi AI. Nilai Supabase ada di **Project Settings > API**. Setelah itu lakukan **Redeploy**.
-6. **Clone repo ke laptop.**
+4. **Pasang tabel dan aturan fitur bonus.** Jalankan seluruh isi `docs/schema-tambahan.sql` setelah `schema.sql`. Fitur admin, galeri, ulasan, statistik, dan pembatasan kiriman memerlukan skema ini.
+5. **Siapkan akun admin.** Buat dan konfirmasi pengguna di **Authentication > Users**, lalu jalankan `docs/bootstrap-admin.sql` setelah mengganti placeholder dengan email akun tersebut. Ini memberi role admin yang diperiksa aplikasi. Setelah itu matikan pendaftaran akun baru di **Authentication > Sign In / Providers**.
+6. **Isi environment variable di Vercel.** Buka proyekmu di Vercel > **Settings > Environment Variables**, lalu isi variabel dari `.env.example`: tiga variabel Supabase, ditambah `GEMINI_API_KEY` kalau memakai fitur AI. Nilai Supabase ada di **Project Settings > API**. Setelah itu lakukan **Redeploy**.
+7. **Clone repo ke laptop.**
 
    ```bash
    git clone https://github.com/<akunmu>/<nama-repo>.git
@@ -19,8 +20,8 @@ Template workshop vibe coding Creative Hub App Talent (CHAT) 2026. Repo ini beri
    npm install
    ```
 
-7. **Buat file `.env.local`.** Salin `.env.example` menjadi `.env.local`, lalu isi dengan nilai yang sama seperti di Vercel.
-8. **Jalankan di laptop.**
+8. **Buat file `.env.local`.** Salin `.env.example` menjadi `.env.local`, lalu isi dengan nilai yang sama seperti di Vercel.
+9. **Jalankan di laptop.**
 
    ```bash
    npm run dev

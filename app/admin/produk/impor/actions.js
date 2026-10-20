@@ -114,9 +114,15 @@ export async function imporProduk(_keadaan, formData) {
       continue;
     }
 
-    if (!/^\d+$/.test(hargaTeks) || !Number.isInteger(harga) || harga <= 0) {
+    if (
+      !/^\d+$/.test(hargaTeks) ||
+      !Number.isSafeInteger(harga) ||
+      harga <= 0 ||
+      harga > 2147483647 ||
+      nama.length > 200
+    ) {
       dilewati.push(
-        `Baris ${nomorBaris}: harga harus angka bulat lebih dari 0.`
+        `Baris ${nomorBaris}: nama maksimal 200 karakter dan harga harus angka bulat 1 sampai 2147483647.`
       );
       continue;
     }

@@ -33,6 +33,7 @@ export async function tambahAdmin(_keadaan, formData) {
     email,
     password,
     email_confirm: true,
+    app_metadata: { role: "admin" },
   });
 
   if (error) {
@@ -70,6 +71,12 @@ export async function hapusAdmin(formData) {
   }
 
   const admin = buatKlienServer();
+  const { data, error: errorPengguna } = await admin.auth.admin.getUserById(id);
+
+  if (errorPengguna || data?.user?.app_metadata?.role !== "admin") {
+    redirect("/admin/akun?pesan=gagal");
+  }
+
   const { error } = await admin.auth.admin.deleteUser(id);
 
   if (error) {

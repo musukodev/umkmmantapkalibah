@@ -30,6 +30,7 @@ export default async function HalamanBandingkan({ searchParams }) {
     const { data: semua, error: errorSemua } = await supabase
       .from("produk")
       .select("id, nama")
+      .eq("aktif", true)
       .order("nama", { ascending: true });
 
     if (errorSemua) {
@@ -43,6 +44,7 @@ export default async function HalamanBandingkan({ searchParams }) {
       const { data, error } = await supabase
         .from("produk")
         .select("id, nama, harga, deskripsi, foto_url, kategori")
+        .eq("aktif", true)
         .in("id", ids);
 
       if (error) {

@@ -3,45 +3,7 @@
 import { headers } from "next/headers";
 import { jawabPertanyaanProduk } from "@/lib/gemini";
 import { buatKlienServer } from "@/lib/supabase/server";
-
-const JENDELA_MS = 10 * 60 * 1000;
-const MAKS_PERTANYAAN = 5;
-const riwayatTanya = new Map();
-
-function ambilIp(kepala) {
-  const diteruskan = kepala.get("x-forwarded-for");
-
-  if (diteruskan) {
-    return diteruskan.split(",")[0].trim();
-  }
-
-  return kepala.get("x-real-ip") || "lokal";
-}
-
-function bolehBertanya(ip) {
-  const sekarang = Date.now();
-  const daftar = (riwayatTanya.get(ip) ?? []).filter(
-    (waktu) => sekarang - waktu < JENDELA_MS
-  );
-
-  if (daftar.length >= MAKS_PERTANYAAN) {
-    riwayatTanya.set(ip, daftar);
-    return false;
-  }
-
-  daftar.push(sekarang);
-  riwayatTanya.set(ip, daftar);
-
-  if (riwayatTanya.size > 500) {
-    for (const [kunci, nilai] of riwayatTanya) {
-      if (!nilai.some((waktu) => sekarang - waktu < JENDELA_MS)) {
-        riwayatTanya.delete(kunci);
-      }
-    }
-  }
-
-  return true;
-}
+import { bolehLakukanAksi } from "@/lib/rate-limit";
 
 function pesanKesalahanGemini(error) {
   if (error.code === "KUNCI_KOSONG") {
@@ -90,9 +52,7 @@ export async function tanyaProduk(_keadaan, formData) {
 
   try {
     const kepala = await headers();
-    const ip = ambilIp(kepala);
-
-    if (!bolehBertanya(ip)) {
+    if (!(await bolehLakukanAksi(kepala, "tanya_produk", 5, 600))) {
       return {
         error: "Terlalu banyak pertanyaan. Coba lagi beberapa menit lagi.",
       };
@@ -103,6 +63,7 @@ export async function tanyaProduk(_keadaan, formData) {
       .from("produk")
       .select("id, nama, harga, kategori, deskripsi")
       .eq("id", id)
+      .eq("aktif", true)
       .maybeSingle();
 
     if (error) {
@@ -116,6 +77,9 @@ export async function tanyaProduk(_keadaan, formData) {
     const jawaban = await jawabPertanyaanProduk({ produk, pertanyaan });
     return { jawaban };
   } catch (error) {
+    if (error.message === "Pemeriksaan batas kiriman belum bisa dilakukan.") {
+      return { error: "Asisten sementara tidak tersedia. Coba lagi beberapa saat lagi." };
+    }
     if (error.code) {
       return { error: pesanKesalahanGemini(error) };
     }

@@ -39,6 +39,7 @@ function bacaKeranjang() {
       .slice(0, 50)
       .map((item) => ({
         id: String(item.id),
+        keranjangId: String(item.keranjangId || item.id),
         nama: item.nama,
         harga: Number(item.harga),
         foto_url: item.foto_url || "",
@@ -53,6 +54,7 @@ function bacaKeranjang() {
 function ringkasProduk(produk) {
   return {
     id: String(produk.id),
+    keranjangId: String(produk.keranjangId || produk.id),
     nama: produk.nama,
     harga: Number(produk.harga),
     foto_url: produk.foto_url || "",
@@ -86,11 +88,13 @@ export function KeranjangProvider({ children }) {
     const tambahan = batasiJumlah(jumlah);
 
     setItems((sebelumnya) => {
-      const ada = sebelumnya.find((item) => item.id === ringkasan.id);
+      const ada = sebelumnya.find(
+        (item) => item.keranjangId === ringkasan.keranjangId
+      );
 
       if (ada) {
         return sebelumnya.map((item) =>
-          item.id === ringkasan.id
+          item.keranjangId === ringkasan.keranjangId
             ? { ...item, jumlah: batasiJumlah(item.jumlah + tambahan) }
             : item
         );
@@ -103,7 +107,7 @@ export function KeranjangProvider({ children }) {
   function aturJumlah(id, jumlah) {
     setItems((sebelumnya) =>
       sebelumnya.map((item) =>
-        item.id === String(id)
+        item.keranjangId === String(id)
           ? { ...item, jumlah: batasiJumlah(jumlah) }
           : item
       )
@@ -112,7 +116,7 @@ export function KeranjangProvider({ children }) {
 
   function hapus(id) {
     setItems((sebelumnya) =>
-      sebelumnya.filter((item) => item.id !== String(id))
+      sebelumnya.filter((item) => item.keranjangId !== String(id))
     );
   }
 

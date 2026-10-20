@@ -1,11 +1,11 @@
 import NavAdmin from "@/components/NavAdmin";
 import FormKategori from "@/components/FormKategori";
-import Tombol from "@/components/Tombol";
 import { wajibAdmin } from "@/lib/auth";
-import { hapusKategori, ubahKategori } from "@/app/admin/kategori/actions";
+import { hapusKategori } from "@/app/admin/kategori/actions";
 
-export default async function HalamanAdminKategori() {
+export default async function HalamanAdminKategori({ searchParams }) {
   const { supabase } = await wajibAdmin();
+  const { pesan } = (await searchParams) ?? {};
 
   let daftarKategori = [];
   try {
@@ -30,6 +30,22 @@ export default async function HalamanAdminKategori() {
 
       <FormKategori />
 
+      {pesan === "kategori-dipakai" ? (
+        <p role="alert" className="text-sm text-bahaya">
+          Kategori ini masih dipakai oleh produk. Pindahkan produk ke kategori lain sebelum menghapusnya.
+        </p>
+      ) : null}
+      {pesan === "gagal-hapus" ? (
+        <p role="alert" className="text-sm text-bahaya">
+          Kategori belum bisa dihapus. Muat ulang halaman lalu coba lagi.
+        </p>
+      ) : null}
+      {pesan === "dihapus" ? (
+        <p role="status" className="text-sm text-utama">
+          Kategori berhasil dihapus.
+        </p>
+      ) : null}
+
       <div className="overflow-x-auto rounded-2xl border border-garis">
         <table className="w-full min-w-[500px] text-left text-sm">
           <thead className="bg-permukaan text-teks-lembut">
@@ -49,20 +65,26 @@ export default async function HalamanAdminKategori() {
             ) : (
               daftarKategori.map((kategori) => (
                 <tr key={kategori.id} className="border-t border-garis">
-                  <td className="px-4 py-3 font-semibold">{kategori.nama}</td>
+                  <td className="px-4 py-3">
+                    <p className="mb-2 font-semibold">{kategori.nama}</p>
+                    <details>
+                      <summary className="cursor-pointer text-xs font-semibold text-utama">
+                        Ubah kategori
+                      </summary>
+                      <div className="mt-2 min-w-[240px]">
+                        <FormKategori kategori={kategori} />
+                      </div>
+                    </details>
+                  </td>
                   <td className="px-4 py-3 text-teks-lembut">{kategori.slug}</td>
                   <td className="px-4 py-3 text-right">
                     <form
                       action={hapusKategori}
                       className="inline-block"
-                      onSubmit={undefined}
                     >
                       <input type="hidden" name="id" value={kategori.id} />
                       <input type="hidden" name="nama" value={kategori.nama} />
-                      <button
-                        type="submit"
-                        className="rounded-lg border border-garis px-3 py-1.5 text-xs font-semibold text-bahaya hover:bg-bahaya/10"
-                      >
+                      <button type="submit" className="rounded-lg border border-garis px-3 py-1.5 text-xs font-semibold text-bahaya hover:bg-bahaya/10">
                         Hapus
                       </button>
                     </form>

@@ -37,7 +37,9 @@ export default function KartuProduk({ produk }) {
         </div>
       </div>
       <div className="flex flex-1 flex-col gap-2 p-3">
-        <p className="text-xs text-teks-lembut">{produk.kategori}</p>
+        <p className="text-xs text-teks-lembut">
+          {produk.kategori || "Tanpa kategori"}
+        </p>
         <h3 className="font-semibold leading-snug group-hover:text-utama">
           {produk.nama}
         </h3>

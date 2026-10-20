@@ -7,6 +7,28 @@ import { formatRupiah } from "@/lib/format";
 import { wajibAdmin } from "@/lib/auth";
 
 const PRODUK_PER_HALAMAN = 10;
+const UKURAN_BATCH_RINGKASAN = 500;
+
+async function ambilSemuaBaris(buatQuery) {
+  const baris = [];
+
+  for (let awal = 0; ; awal += UKURAN_BATCH_RINGKASAN) {
+    const { data, error } = await buatQuery().range(
+      awal,
+      awal + UKURAN_BATCH_RINGKASAN - 1
+    );
+
+    if (error) {
+      throw error;
+    }
+
+    const halaman = data ?? [];
+    baris.push(...halaman);
+    if (halaman.length < UKURAN_BATCH_RINGKASAN) {
+      return baris;
+    }
+  }
+}
 
 export default async function HalamanAdmin({ searchParams }) {
   const { supabase } = await wajibAdmin();
@@ -37,26 +59,42 @@ export default async function HalamanAdmin({ searchParams }) {
       queryHitung = queryHitung.ilike("nama", `%${pola}%`);
     }
 
-    const [hasilHitung, hasilRingkasan, hasilKlik] = await Promise.all([
+    const [hasilHitung, hasilTotal, hasilRingkasan, hasilKlik] = await Promise.all([
       queryHitung,
-      supabase.from("produk").select("id, nama, kategori"),
-      supabase.from("klik_whatsapp").select("produk_id"),
+      supabase.from("produk").select("id", { count: "exact", head: true }),
+      ambilSemuaBaris(() =>
+        supabase
+          .from("produk")
+          .select("id, nama, kategori")
+          .order("id", { ascending: true })
+      ),
+      supabase
+        .from("ringkasan_klik_whatsapp")
+        .select("produk_id, jumlah_klik")
+        .order("jumlah_klik", { ascending: false })
+        .limit(5),
     ]);
 
     if (hasilHitung.error) {
       throw hasilHitung.error;
     }
+    if (hasilTotal.error) {
+      throw hasilTotal.error;
+    }
+    if (hasilKlik.error) {
+      throw hasilKlik.error;
+    }
 
     jumlahTotal = hasilHitung.count ?? 0;
+    totalProduk = hasilTotal.count ?? 0;
     totalHalaman = Math.ceil(jumlahTotal / PRODUK_PER_HALAMAN);
     halamanTidakAda = totalHalaman > 0 && halaman > totalHalaman;
 
     const mapProduk = new Map();
-    if (hasilRingkasan.data) {
-      totalProduk = hasilRingkasan.data.length;
+    if (hasilRingkasan) {
       const ringkasan = new Map();
 
-      for (const p of hasilRingkasan.data) {
+      for (const p of hasilRingkasan) {
         mapProduk.set(p.id, p);
         const k = p.kategori || "Tanpa kategori";
         ringkasan.set(k, (ringkasan.get(k) ?? 0) + 1);
@@ -67,22 +105,15 @@ export default async function HalamanAdmin({ searchParams }) {
         .sort((a, b) => b.jumlah - a.jumlah || a.nama.localeCompare(b.nama, "id"));
     }
 
-    if (hasilKlik.data) {
-      totalKlikWa = hasilKlik.data.length;
-      const frekuensi = new Map();
-      for (const klik of hasilKlik.data) {
-        frekuensi.set(klik.produk_id, (frekuensi.get(klik.produk_id) ?? 0) + 1);
-      }
-
-      produkTerpopuler = [...frekuensi.entries()]
-        .map(([produkId, jumlahKlik]) => ({
-          produkId,
-          jumlahKlik,
-          nama: mapProduk.get(produkId)?.nama || `Produk #${produkId}`,
-        }))
-        .sort((a, b) => b.jumlahKlik - a.jumlahKlik)
-        .slice(0, 5);
-    }
+    totalKlikWa = (hasilKlik.data ?? []).reduce(
+      (total, item) => total + Number(item.jumlah_klik || 0),
+      0
+    );
+    produkTerpopuler = (hasilKlik.data ?? []).map((item) => ({
+      produkId: item.produk_id,
+      jumlahKlik: Number(item.jumlah_klik || 0),
+      nama: mapProduk.get(item.produk_id)?.nama || `Produk #${item.produk_id}`,
+    }));
 
     if (!halamanTidakAda && jumlahTotal > 0) {
       const dari = (halaman - 1) * PRODUK_PER_HALAMAN;
@@ -152,6 +183,12 @@ export default async function HalamanAdmin({ searchParams }) {
         </p>
       ) : null}
 
+      {pesan === "gagal-status" ? (
+        <p role="alert" className="text-sm text-bahaya">
+          Status produk belum bisa diperbarui. Muat ulang halaman lalu coba lagi.
+        </p>
+      ) : null}
+
       <div className="grid gap-6 lg:grid-cols-3">
         <section aria-labelledby="ringkasan-produk" className="flex flex-col gap-3 lg:col-span-2">
           <h2
@@ -167,7 +204,7 @@ export default async function HalamanAdmin({ searchParams }) {
                 {totalProduk}
               </p>
             </div>
-            {kategoriRingkas.slice(0, 5).map((kategori) => (
+            {kategoriRingkas.map((kategori) => (
               <div
                 key={kategori.nama}
                 className="rounded-2xl border border-garis bg-permukaan p-4"

@@ -1,6 +1,7 @@
 import { formatRupiah } from "@/lib/format";
 import Tombol from "@/components/Tombol";
 import TombolHapus from "@/components/TombolHapus";
+import { toggleAktifProduk } from "@/app/admin/status-actions";
 
 export default function TabelProduk({ daftarProduk, adaPencarian = false }) {
   return (
@@ -88,6 +89,20 @@ export default function TabelProduk({ daftarProduk, adaPencarian = false }) {
                 <td className="px-4 py-3 text-teks-lembut">{produk.urutan ?? 0}</td>
                 <td className="px-4 py-3">
                   <div className="flex justify-end gap-2">
+                    <form action={toggleAktifProduk}>
+                      <input type="hidden" name="id" value={produk.id} />
+                      <input
+                        type="hidden"
+                        name="aktif"
+                        value={String(produk.aktif !== false)}
+                      />
+                      <button
+                        type="submit"
+                        className="rounded-lg border border-garis px-3 py-2 text-xs font-semibold hover:border-utama hover:text-utama"
+                      >
+                        {produk.aktif === false ? "Aktifkan" : "Nonaktifkan"}
+                      </button>
+                    </form>
                     <Tombol href={`/admin/produk/${produk.id}/ubah`} varian="garis">
                       Ubah
                     </Tombol>

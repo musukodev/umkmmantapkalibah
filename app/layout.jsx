@@ -1,4 +1,5 @@
 import "./globals.css";
+import Script from "next/script";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import DaftarServiceWorker from "@/components/DaftarServiceWorker";
@@ -44,12 +45,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="id" suppressHydrationWarning>
       <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html:
-              "(function(){try{if(localStorage.getItem('tema')==='gelap'){document.documentElement.classList.add('dark');}}catch(e){}})();",
-          }}
-        />
+        <Script src="/theme.js" strategy="beforeInteractive" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link

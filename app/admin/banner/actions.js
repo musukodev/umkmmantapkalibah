@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { wajibAdmin } from "@/lib/auth";
 import { catatLogAdmin } from "@/lib/log";
 
@@ -26,9 +27,17 @@ export async function simpanBanner(_keadaan, formData) {
   };
 
   if (id) {
-    const { error } = await supabase.from("banner").update(payload).eq("id", id);
+    const { data: hasil, error } = await supabase
+      .from("banner")
+      .update(payload)
+      .eq("id", id)
+      .select("id")
+      .maybeSingle();
     if (error) {
       return { error: "Banner belum bisa diperbarui. Coba lagi." };
+    }
+    if (!hasil) {
+      return { error: "Banner tidak ditemukan. Muat ulang halaman lalu coba lagi." };
     }
     await catatLogAdmin(supabase, user, "UBAH_BANNER", `${judul} (#${id})`);
   } else {
@@ -52,7 +61,20 @@ export async function toggleAktifBanner(formData) {
   if (!id) return;
 
   const nilaiBaru = !aktifSekarang;
-  await supabase.from("banner").update({ aktif: nilaiBaru }).eq("id", id);
+  const { data, error } = await supabase
+    .from("banner")
+    .update({ aktif: nilaiBaru })
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
+
+  if (error || !data) {
+    if (error) {
+      console.error("Gagal mengubah status banner:", error.message);
+    }
+    redirect("/admin/banner?pesan=gagal");
+  }
+
   await catatLogAdmin(
     supabase,
     user,
@@ -68,9 +90,18 @@ export async function hapusBanner(formData) {
   const { supabase, user } = await wajibAdmin();
   const id = String(formData.get("id") ?? "").trim();
 
-  if (!id) return;
+  if (!/^\d+$/.test(id)) redirect("/admin/banner?pesan=gagal");
 
-  await supabase.from("banner").delete().eq("id", id);
+  const { data, error } = await supabase
+    .from("banner")
+    .delete()
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
+  if (error || !data) {
+    console.error("Gagal menghapus banner:", error?.message || "Banner tidak ditemukan.");
+    redirect("/admin/banner?pesan=gagal");
+  }
   await catatLogAdmin(supabase, user, "HAPUS_BANNER", `Banner #${id}`);
 
   revalidatePath("/admin/banner");

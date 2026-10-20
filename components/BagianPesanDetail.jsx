@@ -13,12 +13,15 @@ export default function BagianPesanDetail({
     daftarVarian.length > 0 ? daftarVarian[0] : null
   );
 
+  const hargaDiskon = Number(produk.harga_diskon);
+  const hargaNormal = Number(produk.harga);
   const adaDiskon =
     !varianDipilih &&
     produk.harga_diskon !== undefined &&
     produk.harga_diskon !== null &&
-    Number(produk.harga_diskon) > 0 &&
-    Number(produk.harga_diskon) < Number(produk.harga);
+    Number.isFinite(hargaDiskon) &&
+    hargaDiskon > 0 &&
+    hargaDiskon < hargaNormal;
 
   const hargaTampil = varianDipilih
     ? Number(varianDipilih.harga)

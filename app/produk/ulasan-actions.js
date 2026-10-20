@@ -1,34 +1,9 @@
 "use server";
 
-import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { buatKlienServer } from "@/lib/supabase/server";
-
-const batasUlasan = new Map();
-const JENDELA_MS = 10 * 60 * 1000;
-
-function ambilIp(kepala) {
-  const diteruskan = kepala.get("x-forwarded-for");
-  if (diteruskan) {
-    return diteruskan.split(",")[0].trim();
-  }
-  return kepala.get("x-real-ip") || "lokal";
-}
-
-function bolehKirimUlasan(ip) {
-  const sekarang = Date.now();
-  const riwayat = (batasUlasan.get(ip) ?? []).filter(
-    (waktu) => sekarang - waktu < JENDELA_MS
-  );
-
-  if (riwayat.length >= 3) {
-    return false;
-  }
-
-  riwayat.push(sekarang);
-  batasUlasan.set(ip, riwayat);
-  return true;
-}
+import { buatKlienPublik } from "@/lib/supabase/server";
+import { headers } from "next/headers";
+import { bolehLakukanAksi } from "@/lib/rate-limit";
 
 export async function kirimUlasan(_keadaan, formData) {
   const produkId = String(formData.get("produk_id") ?? "").trim();
@@ -60,21 +35,20 @@ export async function kirimUlasan(_keadaan, formData) {
 
   try {
     const kepala = await headers();
-    const ip = ambilIp(kepala);
 
-    if (!bolehKirimUlasan(ip)) {
+    if (!(await bolehLakukanAksi(kepala, "ulasan", 3, 600))) {
       return {
         error: "Terlalu banyak ulasan dalam waktu singkat. Coba lagi nanti.",
       };
     }
 
-    const supabase = buatKlienServer();
+    const supabase = buatKlienPublik();
     const { error } = await supabase.from("ulasan").insert({
       produk_id: Number(produkId),
       nama,
       rating,
       komentar: komentar || null,
-      tampil: true,
+      tampil: false,
     });
 
     if (error) {
@@ -83,8 +57,11 @@ export async function kirimUlasan(_keadaan, formData) {
     }
 
     revalidatePath(`/produk/${produkId}`);
-    return { sukses: "Terima kasih! Ulasan kamu berhasil dikirim." };
+    return { sukses: "Terima kasih! Ulasan dikirim dan akan tampil setelah diperiksa." };
   } catch (error) {
+    if (error.message === "Pemeriksaan batas kiriman belum bisa dilakukan.") {
+      return { error: "Ulasan sementara tidak tersedia. Coba lagi beberapa saat lagi." };
+    }
     console.error("Error kirim ulasan:", error.message);
     return { error: "Ulasan belum bisa dikirim. Coba lagi." };
   }
